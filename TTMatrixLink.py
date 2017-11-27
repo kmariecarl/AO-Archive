@@ -212,25 +212,19 @@ def findSP(deptime_list, all_paths_dict):
             #now use a method to select one deptime and compare across all PNRs and then for each departure time
             #you may get that different PNR result in the shortest travel time.
             for dptm in deptime_list:
+                dptm_dict = {} #where key=PNR: value=TT
                 #for each deptime make a dictionary of all PNRs: tt, once the dict is created, run min().
-                #Set preliminary previous shortest path
-                print('origin:', origin, 'destination:', destination, 'deptime:', dptm)
-                previous_sp = 1000000
-                print('previous_sp:', previous_sp)
-
                 for PNR, timing in all_paths_dict[origin][destination].items():
-                    print('pnr:', PNR)
+                    dptm_dict[PNR] = all_paths_dict[origin][destination][PNR][dptm]
+                print("dptm_dict: ", origin, destination, dptm_dict)
 
-                    #Set the PNR with the shortest tt for the given departure time
-                    #try:
-                    current_sp = all_paths_dict[origin][destination][PNR][dptm]
-                    print('current_sp:', current_sp)
-                    if current_sp < previous_sp:
-                        add2SPDict(origin, destination, dptm, PNR, current_sp)
-                    else:
-                        previous_sp = current_sp
-                    previous_sp = current_sp
-                    #Do something to collect sp PNRs for record to print out
+                minPNR = min(dptm_dict, key=dptm_dict.get)
+                print("minPNR: ", minPNR)
+                minTT = dptm_dict[minPNR]
+                #minTT = all_paths_dict[origin][destination][minPNR][dptm]
+                #So far haven't addressed if two PNRs have equal and minimal TTs.
+                add2SPDict(origin, destination, dptm, minPNR, minTT)
+                #Do something to collect sp PNRs for record to print out
 
 def add2SPDict(origin, destination, dptm, pnr, sp_tt):
     if origin not in spDict:
@@ -266,6 +260,21 @@ def add2SPDict(origin, destination, dptm, pnr, sp_tt):
     # else:
     #     spDict[origin][destination][dptm][pnr] = sp_tt
     #     print('VALUE ADDED5')
+def countPNRS(spDict):
+    #Create a dictionary to store PNRS with the OD pairs that use each PNR in their SP.
+    count_dict = {}
+    for origin, outter in spDict.items():
+        for destination, inner in spDict[origin].items():
+            for deptime, locations in spDict[origin][destination].items():
+                for pnr, tt in spDict[origin][destination][deptime].items():
+                    label = origin + "_" + destination
+                    if pnr not in count_dict:
+                        count_dict[pnr] = []
+                    else:
+                        count_dict[pnr].append(label)
+    #Now print out the number of SPs that pass through each PNR
+    for row_pnr, row_list in count_dict.items():
+        print(row_pnr, len(row_list))
 
 
 
@@ -310,4 +319,5 @@ if __name__ == '__main__':
         #2. Grab the same PNR connected to origins and link paths if criteria are met
         linkPaths(key_PNR, dest_dict, p2oDict)
     findSP(deptimeList, allPathsDict)
+    countPNRS(spDict)
     writeSP(spDict)
