@@ -10,10 +10,8 @@
 
 
 #NOTES:
-#Consider mainting a counter of the number of times each PNR was found to be in the shortest path
 
-#By finding the pnr that results in the sp for each OD pair, there is potential for back-tracking
-#  from the origin to PNR.
+#In order to use this script, TT by auto from O to PNR, TT by transit from PNR to D, must be calculated.
 
 #Wait time at the PNR for transit service is accounted for by the PNR2D TT matrix whereby averaging the
 # travel times from O to D across departure times, you have captured half of the headway of each route.
@@ -28,6 +26,7 @@ import csv
 import datetime
 import time
 import argparse
+import numpy
 
 #################################
 #           FUNCTIONS           #
@@ -101,6 +100,14 @@ def makeList(p2o_dict):
     print("Deptime list:", list)
     return list
 
+#This function calculates the bottom 15th percentile travel time ~= 85th percentile
+def calcPercentile(dest_dict, dest):
+    tt_list = []
+    for deptime, tt in dest_dict[dest].items():
+        tt_list.append(tt)
+    tile = numpy.percentile(tt_list, 15)
+    return tile
+
 
 #Every use of this function accounts for all paths connecting through the selected PNR.
 #select PNR -> select destination -> select origin -> select destination departure time
@@ -110,6 +117,8 @@ def linkPaths(key_PNR, dest_dict, p2o_dict):
     #3. Iterate through the different destination for the PNR that has been selected
     dest_list = [i for i in dest_dict.keys()]
     for dest in dest_list:
+        #Find 85th percentile TT for this destination
+        tile = calcPercentile(dest_dict, dest)
         #4. Iterate through origin paths for the selected PNR + destination path selected by outter for loop
         origin_list = [k for k in orgn_dict.keys()]
         for orgn in origin_list:
@@ -121,11 +130,14 @@ def linkPaths(key_PNR, dest_dict, p2o_dict):
                     windowMin = convert2Sec(dest_deptime) - 300
                     windowMax = convert2Sec(dest_deptime) + 300
                     if windowMin <= depsum <= windowMax:
-                        path_TT = int(or_traveltime) + int(dest_traveltime)
-                        #7 This path is viable, add to list.
-                        print(orgn, dest, key_PNR, or_deptime, path_TT)
-                        print("send to all_paths_dict")
-                        add2AllPathsDict(orgn, dest, key_PNR, or_deptime, path_TT)
+                        #Also try to check if path TT is in the 85th percentile of lowest TTs before
+                        #adding it to the allPathsDict.
+                        if depsum <= tile:
+                            path_TT = int(or_traveltime) + int(dest_traveltime)
+                            #7 This path is viable, add to list.
+                            print(orgn, dest, key_PNR, or_deptime, path_TT)
+                            print("send to all_paths_dict")
+                            add2AllPathsDict(orgn, dest, key_PNR, or_deptime, path_TT)
 
 
 
