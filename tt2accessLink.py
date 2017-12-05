@@ -39,24 +39,27 @@ def elapsedTime():
     elapsed_time = time.time() - start_time
     print("Elapsed Time: ", elapsed_time)
 
+#A standard way to open a new file to write to.
 def mkOutput(currentTime, fieldnames, name):
     outfile = open('output_{}_{}.txt'.format(name,curtime), 'w')
     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
     writer.writeheader()
     return writer
 
-#Make a dictReader object from input file
-def makeNestedDict(file):
-    input = open(file, 'r')
+#Make a dictReader object from input file which mimics the spDict formation made in "TTMatrixLink.py"
+def makeNestedDict(linked_tt_file):
+    input = open(linked_tt_file, 'r')
     reader = csv.DictReader(input)
     #Initiate outter dict
     nest = {}
     for row in reader:
+        #reassign dictionary keys to function variables
         origin = row['origin']
         destination = row['destination']
         deptime = row['deptime']
         PNR = row['PNR']
         minTT = row['minTT']
+        #Begin layering dictionary
         if origin not in nest:
             nest[origin] = {}
 
@@ -91,13 +94,14 @@ def makeNestedDict(file):
     return nest
 
 #Make destination + job file into dict obj
-def makeJobsDict(file):
-    input = open(file, 'r')
+def makeJobsDict(jobs_file):
+    input = open(jobs_file, 'r')
     reader = csv.DictReader(input)
     jobs_dict = {}
     for row in reader:
         destin = row['GEOID10']
         jobs = row['C000']
+        #Make empty values into zeros
         if jobs == '':
             jobs_dict[destin] = 0
         else:
@@ -105,114 +109,84 @@ def makeJobsDict(file):
     print("Created Jobs Dictionary")
     return jobs_dict
 
-def addThresholds(df):
-    df.update(thresh300=[])
-    df.update(thresh600=[])
-    df.update(thresh900=[])
-    df.update(thresh1200=[])
-    df.update(thresh1500=[])
-    df.update(thresh1800=[])
-    df.update(thresh2100=[])
-    df.update(thresh2400=[])
-    df.update(thresh2700=[])
-    df.update(thresh3000=[])
-    df.update(thresh3300=[])
-    df.update(thresh3600=[])
-    df.update(thresh3900=[])
-    df.update(thresh4200=[])
-    df.update(thresh4500=[])
-    df.update(thresh4800=[])
-    df.update(thresh5100=[])
-    df.update(thresh5400=[])
+#When a new origin_deptime combo has been found, add key=threshold, value = empty destination list
+def addThresholds(df, orgn, dptm):
+    df[orgn][dptm]['300'] = []
+    df[orgn][dptm]['600'] = []
+    df[orgn][dptm]['900'] = []
+    df[orgn][dptm]['1200'] = []
+    df[orgn][dptm]['1500'] = []
+    df[orgn][dptm]['1800'] = []
+    df[orgn][dptm]['2100'] = []
+    df[orgn][dptm]['2400'] = []
+    df[orgn][dptm]['2700'] = []
+    df[orgn][dptm]['3000'] = []
+    df[orgn][dptm]['3300'] = []
+    df[orgn][dptm]['3600'] = []
+    df[orgn][dptm]['3900'] = []
+    df[orgn][dptm]['4200'] = []
+    df[orgn][dptm]['4500'] = []
+    df[orgn][dptm]['4800'] = []
+    df[orgn][dptm]['5100'] = []
+    df[orgn][dptm]['5400'] = []
 
-#Break open the TT dict object to start linking it with jobs
+#internalDF looks like:
+#{origin:{deptime:{thresh1:[dest1, dest2, dest3...],
+#                  thresh2:[dest1, dest2, dest3...],
+#                  thresh3:[dest1, dest2, dest3...]}
+#         deptime:{thresh1:[dest1, dest2, dest3...],
+#                  thresh2:[dest1, dest2, dest3...],
+#                  thresh3:[dest1, dest2, dest3...]}}
+#origin:{...
+
+#Break open the spTT dict object to start linking it with jobs
 def restructureDF(tt_dict):
     internalDF = {}
     for origin, outter in tt_dict.items():
         for deptime, locations in tt_dict[origin].items():
             for destination, inner in tt_dict[origin][deptime].items():
                 for pnr, tt in tt_dict[origin][deptime][destination].items():
-                    #for a given origin + deptime, match all destinations per threshold list.
-                        if origin not in internalDF:
-                            internalDF[origin] = {}
-
-                            if deptime not in internalDF[origin]:
-                                internalDF[origin][deptime] = {}
-                                internalDF2 = addThresholds(internalDF[origin][deptime])
-                                #add threshold key and list value to above dict.
-
-                                filterTT(internalDF2, origin, deptime, destination, tt)
-
-                        elif deptime not in internalDF[origin]:
+                    #Check if origin has been added to the internal df.
+                    if origin not in internalDF:
+                        internalDF[origin] = {}
+                        #Check if deptime has been added to the origin's dictionary
+                        if deptime not in internalDF[origin]:
                             internalDF[origin][deptime] = {}
-                            internalDF2 = addThresholds(internalDF[origin][deptime])
-                            filterTT(internalDF2, origin, deptime, destination, tt)
+                            #If this orgn + dptm combo has not been arrived at previously, add the threshold keys
+                            addThresholds(internalDF, origin, deptime)
+                            #Place the tt and destination into all bins that are >= the value of tt
+                            filterTT(internalDF, origin, deptime, destination, tt)
+                    #If origin has been found but deptime has not been, then do the following
+                    elif deptime not in internalDF[origin]:
+                        internalDF[origin][deptime] = {}
+                        # If this orgn + dptm combo has not been arrived at previously, add the threshold keys
+                        addThresholds(internalDF, origin, deptime)
+                        # Place the tt and destination into all bins that are >= the value of tt
+                        filterTT(internalDF, origin, deptime, destination, tt)
+                    #Once the origin and deptime have been placed, add all remaining destinations to the applicable threshold lists
+                    else:
+                        filterTT(internalDF, origin, deptime, destination, tt)
 
+    print("Created Internal DF and Made Destination Lists by Threshold")
+    return internalDF
 
-    print("Restructured the Input DataFrame for Internal Purposes")
-    return internalDF2
+#Place the current row's destination into threshold bins based on its travel time
+def filterTT(internal_df, origin, deptime, destination, tt):
+    #Create a list of thresholds that this destination can be reached in <= time
+    applicable_thresh_list = []
+    for item in threshold_list:
+        if int(tt) <= int(item):
+            applicable_thresh_list.append(item)
+    #Once the applicable thresholds have been found, place destination into lists
+    for thresh in applicable_thresh_list:
+        internal_df[origin][deptime][thresh].append(destination)
 
-def filterTT(internal_dict, origin, deptime, destination, tt):
-
-    if int(tt) <= 300:
-        internal_dict[origin][deptime]['thresh300'].append(destination)
-
-    elif int(tt) <= 600:
-        internal_dict[origin][deptime]['thresh600'].append(destination)
-
-    elif int(tt) <= 900:
-        internal_dict[origin][deptime]['thresh900'].append(destination)
-
-    elif int(tt) <= 1200:
-        internal_dict[origin][deptime]['thresh1200'].append(destination)
-
-    elif int(tt) <= 1500:
-        internal_dict[origin][deptime]['thresh1500'].append(destination)
-
-    elif int(tt) <= 1800:
-        internal_dict[origin][deptime]['thresh1800'].append(destination)
-
-    elif int(tt) <= 2100:
-        internal_dict[origin][deptime]['thresh2100'].append(destination)
-
-    elif int(tt) <= 2400:
-        internal_dict[origin][deptime]['thresh2400'].append(destination)
-
-    elif int(tt) <= 2700:
-        internal_dict[origin][deptime]['thresh2700'].append(destination)
-
-    elif int(tt) <= 3000:
-        internal_dict[origin][deptime]['thresh3000'].append(destination)
-
-    elif int(tt) <= 3300:
-        internal_dict[origin][deptime]['thresh3300'].append(destination)
-
-    elif int(tt) <= 3600:
-        internal_dict[origin][deptime]['thresh3600'].append(destination)
-
-    elif int(tt) <= 3900:
-        internal_dict[origin][deptime]['thresh3900'].append(destination)
-
-    elif int(tt) <= 4200:
-        internal_dict[origin][deptime]['thresh4200'].append(destination)
-
-    elif int(tt) <= 4500:
-        internal_dict[origin][deptime]['thresh4500'].append(destination)
-
-    elif int(tt) <= 4800:
-        internal_dict[origin][deptime]['thresh4800'].append(destination)
-
-    elif int(tt) <= 5100:
-        internal_dict[origin][deptime]['thresh5100'].append(destination)
-
-    elif int(tt) <= 5400:
-        internal_dict[origin][deptime]['thresh5400'].append(destination)
-
-
-def sumJobs(internal_df2):
-    for origin, outter in internal_df2.items():
-        for dptm, inner in internal_df2[origin].items():
-            for thresh, dest_list in internal_df2[origin][dptm].items():
+#Each orgn_dptm_threshold has a list of destinations that can be reached.
+#Sum the jobs associated with each destination and write out the rows
+def sumJobs(internal_df):
+    for origin, outter in internal_df.items():
+        for dptm, inner in internal_df[origin].items():
+            for thresh, dest_list in internal_df[origin][dptm].items():
                 count = 0
                 for dest in dest_list:
                     count = count + int(jobsDict[dest])
@@ -242,9 +216,12 @@ if __name__ == '__main__':
     ttDict = makeNestedDict(args.LINKED_TT)
     jobsDict = makeJobsDict(args.JOBS)
 
+    #Make threshold list to check travel times against.
+    threshold_list = ['300', '600', '900', '1200', '1500', '1800', '2100', '2400', '2700', '3000', '3300', '3600',
+                      '3900', '4200',
+                      '4500', '4800', '5100', '5400']
 
-    internalDF2 = restructureDF(ttDict)
-    sumJobs(internalDF2)
+    internalDF = restructureDF(ttDict)
+    sumJobs(internalDF)
 
 #-----END-----
-
