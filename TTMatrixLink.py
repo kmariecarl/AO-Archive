@@ -346,7 +346,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Create two files, enumerated and averaged by deptime.
-    fieldnames = ['origin', 'destination', 'deptime', 'PNR', 'minTT']
+    fieldnames = ['origin', 'deptime', 'destination', 'PNR', 'minTT']
     writer = mkOutput(curtime, fieldnames, 'paths_linked')
 
     # fieldnames2 = ['origin', 'destination', 'avgTT']
