@@ -63,9 +63,9 @@ def elapsedTime():
     elapsed_time = time.time() - start_time
     print("Elapsed Time: ", elapsed_time)
 
-def mkOutput(currentTime, fieldnames):
-    outfile = open('output_{}.txt'.format(curtime), 'w')  # , newline=''
-    writer = csv.DictWriter(outfile, fieldnames=fieldnames)  # , quotechar = "'"
+def mkOutput(currentTime, fieldnames, name):
+    outfile = open('output_{}_{}.txt'.format(name,curtime), 'w')
+    writer = csv.DictWriter(outfile, fieldnames=fieldnames)
     writer.writeheader()
     return writer
 
@@ -142,7 +142,7 @@ def linkPaths(key_PNR, dest_dict, p2o_dict):
         #print("dest: ", dest)
         #Find 15th percentile TT for this destination
         dest_tile = calcPercentile(dest_dict, dest)
-        print("PNR:", key_PNR, "Destination:", dest, "Percentile:", dest_tile)
+        #print("PNR:", key_PNR, "Destination:", dest, "Percentile:", dest_tile)
         #4. Iterate through origin paths for the selected PNR + destination path selected by outter for loop
         origin_list = [k for k in orgn_dict.keys()]
         for orgn in origin_list:
@@ -161,11 +161,11 @@ def linkPaths(key_PNR, dest_dict, p2o_dict):
                         if windowMin <= depsum <= windowMax:
                             path_TT = int(or_traveltime) + int(dest_traveltime)
                             #7 This path is viable, add to list.
-                            print("Origin:",orgn, "PNR:", key_PNR, "Dest:", dest, "Deptime:", or_deptime, "TT:", path_TT)
-                            elapsedTime()
+                            #print("Origin:",orgn, "PNR:", key_PNR, "Dest:", dest, "Deptime:", or_deptime, "TT:", path_TT)
+                            #elapsedTime()
                             #print("send to all_paths_dict")
                             add2AllPathsDict(orgn, dest, key_PNR, or_deptime, path_TT)
-                            elapsedTime()
+
 
 
 
@@ -246,54 +246,54 @@ def findSP(deptime_list, all_paths_dict):
                     if dptm in all_paths_dict[origin][destination][PNR]:
                         dptm_dict[PNR] = all_paths_dict[origin][destination][PNR][dptm]
 
-                    print("dptm_dict: ", dptm_dict)
+                    #print("dptm_dict: ", dptm_dict)
                     if any(dptm_dict) == True:
-                        print("Found a OD + PNR combo that doesn't have a SP for the selected departure time")
+                        #print("Found a OD + PNR combo that doesn't have a SP for the selected departure time")
                         minPNR = min(dptm_dict, key=dptm_dict.get)
                         #print("minPNR: ", minPNR)
                         minTT = dptm_dict[minPNR]
                         #minTT = all_paths_dict[origin][destination][minPNR][dptm]
                         #So far haven't addressed if two PNRs have equal and minimal TTs.
-                        print("SP between", origin, "and", destination, "uses PNR", minPNR, "TT=", minTT)
-                        elapsedTime()
-                        add2SPDict(origin, destination, dptm, minPNR, minTT)
-                        #Do something to collect sp PNRs for record to print out
+                        #print("SP between", origin, "and", destination, "uses PNR", minPNR, "TT=", minTT)
+                        #elapsedTime()
+                        add2SPDict(origin, dptm, destination, minPNR, minTT)
+    print("Shortest Paths Are Found")
 
-def add2SPDict(origin, destination, dptm, pnr, sp_tt):
+def add2SPDict(origin, dptm, destination, pnr, sp_tt):
     if origin not in spDict:
         spDict[origin] = {}
-  
-        if destination not in spDict[origin]:
-            spDict[origin][destination] = {}
 
-            if dptm not in spDict[origin][destination]:
-                spDict[origin][destination][dptm] = {}
+        if dptm not in spDict[origin]:
+            spDict[origin][dptm] = {}
 
-                if pnr not in spDict[origin][destination][dptm]:
-                    spDict[origin][destination][dptm][pnr] = sp_tt
+            if destination not in spDict[origin][dptm]:
+                spDict[origin][dptm][destination] = {}
 
-    elif destination not in spDict[origin]:
-        spDict[origin][destination] = {}
+                if pnr not in spDict[origin][dptm][destination]:
+                    spDict[origin][dptm][destination][pnr] = sp_tt
 
-        if dptm not in spDict[origin][destination]:
-            spDict[origin][destination][dptm] = {}
+    elif dptm not in spDict[origin]:
+            spDict[origin][dptm] = {}
 
-            if pnr not in spDict[origin][destination][dptm]:
-                spDict[origin][destination][dptm][pnr] = sp_tt
+            if destination not in spDict[origin][dptm]:
+                spDict[origin][dptm][destination] = {}
 
-    elif dptm not in spDict[origin][destination]:
-        spDict[origin][destination][dptm] = {}
+                if pnr not in spDict[origin][dptm][destination]:
+                    spDict[origin][dptm][destination][pnr] = sp_tt
 
-        if pnr not in spDict[origin][destination][dptm]:
-            spDict[origin][destination][dptm][pnr] = sp_tt
+    elif destination not in spDict[origin][dptm]:
+                spDict[origin][dptm][destination] = {}
+
+                if pnr not in spDict[origin][dptm][destination]:
+                    spDict[origin][dptm][destination][pnr] = sp_tt
 
 def countPNRS(spDict):
     #Create a dictionary to store PNRS with the OD pairs that use each PNR in their SP.
     count_dict = {}
     for origin, outter in spDict.items():
-        for destination, inner in spDict[origin].items():
-            for deptime, locations in spDict[origin][destination].items():
-                for pnr, tt in spDict[origin][destination][deptime].items():
+        for deptime, inner in spDict[origin].items():
+            for destination, locations in spDict[origin][deptime].items():
+                for pnr, tt in spDict[origin][deptime][destination].items():
                     label = origin + "_" + destination
                     if pnr not in count_dict:
                         count_dict[pnr] = []
@@ -307,11 +307,28 @@ def countPNRS(spDict):
 
 def writeSP(spDict):
     for origin, outter in spDict.items():
-        for destination, inner in spDict[origin].items():
-            for deptime, locations in spDict[origin][destination].items():
-                for pnr, tt in spDict[origin][destination][deptime].items():
-                    entry = {'origin': origin, 'destination': destination, 'deptime': deptime, 'PNR': pnr, 'minTT': tt}
+        for deptime, inner in spDict[origin].items():
+            for destination, locations in spDict[origin][deptime].items():
+                for pnr, tt in spDict[origin][deptime][destination].items():
+                    entry = {'origin': origin, 'deptime': deptime, 'destination': destination, 'PNR': pnr, 'minTT': tt}
                     writer.writerow(entry)
+    print("Shortest Paths Results File Written")
+#Not in use currently
+# def writeAvgSP(spDict):
+#     for origin, outter in spDict.items():
+#         for destination, inner in spDict[origin].items():
+#             dest_label = destination
+#             tt_list = []
+#             for deptime, locations in spDict[origin][destination].items():
+#                 for pnr, tt in spDict[origin][destination][deptime].items():
+#                     while dest_label == destination:
+#                         tt_list.append(tt)
+#             or_dest_avg = sum(tt_list)/len(tt_list)
+#             entry = {'origin': origin, 'destination': destination, 'avgTT': or_dest_avg}
+#             writer2.writerow(entry)
+                #elapsedTime()
+
+
 
 
 #################################
@@ -328,8 +345,12 @@ if __name__ == '__main__':
     parser.add_argument('-p2d', '--PNR2D_FILE', required=True, default=None)
     args = parser.parse_args()
 
+    #Create two files, enumerated and averaged by deptime.
     fieldnames = ['origin', 'destination', 'deptime', 'PNR', 'minTT']
-    writer = mkOutput(curtime, fieldnames)
+    writer = mkOutput(curtime, fieldnames, 'paths_linked')
+
+    # fieldnames2 = ['origin', 'destination', 'avgTT']
+    # writer2 = mkOutput(curtime, fieldnames1, 'averaged')
 
     p2oDict = makeNestedDict(args.O2PNR_FILE, 'destination', 'origin')
     p2dDict = makeNestedDict(args.PNR2D_FILE, 'origin', 'destination')
@@ -345,7 +366,10 @@ if __name__ == '__main__':
         #2. Grab the same PNR connected to origins and link paths if criteria are met
         linkPaths(key_PNR, dest_dict, p2oDict)
         runtime = time.time() - start_time
+        #This prints each time a PNR has been connected to all origins and destinations
         print("Paths linked. Runtime =", runtime )
     findSP(deptimeList, allPathsDict)
+    for row, value in spDict.items():
+        print(row, value)
     countPNRS(spDict)
     writeSP(spDict)
