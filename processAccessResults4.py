@@ -1,5 +1,7 @@
 # This program performs mathematical operations to calculate four forms of accessibility values per origin ID.
 
+#This program should be used after converting raw access output to averages using Average_transit_local.py
+
 # TO DO:
 # Implement argparser for the user to input the names of the two input files.
 # Auto populate threshold list. Figure out how to read first line of input files to create iterator for dictionary creation.
