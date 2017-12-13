@@ -10,6 +10,7 @@ import csv
 import datetime
 import time
 import argparse
+from collections import OrderedDict
 
 #################################
 #           FUNCTIONS           #
@@ -47,18 +48,25 @@ def mkOutput(currentTime, fieldnames, name):
     return writer
 
 #Make a dictReader object from input file which mimics the spDict formation made in "TTMatrixLink.py"
+#{origin:{deptime:{destination:TT,
+#                  destination:TT,
+#                  destination:TT},
+#         deptime:{destination:TT,
+#                  destination:TT,
+#                  destination:TT}},
+# origin:{...
+
 def makeNestedDict(linked_tt_file):
     input = open(linked_tt_file, 'r')
     reader = csv.DictReader(input)
     #Initiate outter dict
     nest = {}
     for row in reader:
-        #reassign dictionary keys to function variables
+        #reassign dictionary keys to function variables. No need to handle PNR information so it is dropped.
         origin = row['origin']
         destination = row['destination']
         deptime = row['deptime']
-        PNR = row['PNR']
-        minTT = row['minTT']
+        minTT = row['traveltime']
         #Begin layering dictionary
         if origin not in nest:
             nest[origin] = {}
@@ -67,28 +75,16 @@ def makeNestedDict(linked_tt_file):
                 nest[origin][deptime] = {}
 
                 if destination not in nest[origin][deptime]:
-                    nest[origin][deptime][destination] = {}
-
-                    if PNR not in nest[origin][deptime][destination]:
-                        nest[origin][deptime][destination][PNR] = minTT
+                    nest[origin][deptime][destination] = minTT
 
         elif deptime not in nest[origin]:
                 nest[origin][deptime] = {}
 
                 if destination not in nest[origin][deptime]:
-                    nest[origin][deptime][destination] = {}
-
-                    if PNR not in nest[origin][deptime][destination]:
-                        nest[origin][deptime][destination][PNR] = minTT
+                    nest[origin][deptime][destination] = minTT
 
         elif destination not in nest[origin][deptime]:
-                    nest[origin][deptime][destination] = {}
-
-                    if PNR not in nest[origin][deptime][destination]:
-                        nest[origin][deptime][destination][PNR] = minTT
-
-        elif PNR not in nest[origin][deptime][destination]:
-            nest[origin][deptime][destination][PNR] = minTT
+                    nest[origin][deptime][destination] = minTT
 
     print("Created Nested Dictionary")
     return nest
@@ -110,6 +106,7 @@ def makeJobsDict(jobs_file):
     return jobs_dict
 
 #When a new origin_deptime combo has been found, add key=threshold, value = empty destination list
+#Each list will be filled by the filterTT function.
 def addThresholds(df, orgn, dptm):
     df[orgn][dptm]['300'] = []
     df[orgn][dptm]['600'] = []
@@ -144,28 +141,27 @@ def restructureDF(tt_dict):
     internalDF = {}
     for origin, outter in tt_dict.items():
         for deptime, locations in tt_dict[origin].items():
-            for destination, inner in tt_dict[origin][deptime].items():
-                for pnr, tt in tt_dict[origin][deptime][destination].items():
-                    #Check if origin has been added to the internal df.
-                    if origin not in internalDF:
-                        internalDF[origin] = {}
-                        #Check if deptime has been added to the origin's dictionary
-                        if deptime not in internalDF[origin]:
-                            internalDF[origin][deptime] = {}
-                            #If this orgn + dptm combo has not been arrived at previously, add the threshold keys
-                            addThresholds(internalDF, origin, deptime)
-                            #Place the tt and destination into all bins that are >= the value of tt
-                            filterTT(internalDF, origin, deptime, destination, tt)
-                    #If origin has been found but deptime has not been, then do the following
-                    elif deptime not in internalDF[origin]:
+            for destination, tt in tt_dict[origin][deptime].items():
+                #Check if origin has been added to the internal df.
+                if origin not in internalDF:
+                    internalDF[origin] = {}
+                    #Check if deptime has been added to the origin's dictionary
+                    if deptime not in internalDF[origin]:
                         internalDF[origin][deptime] = {}
-                        # If this orgn + dptm combo has not been arrived at previously, add the threshold keys
+                        #If this orgn + dptm combo has not been arrived at previously, add the threshold keys
                         addThresholds(internalDF, origin, deptime)
-                        # Place the tt and destination into all bins that are >= the value of tt
+                        #Place the tt and destination into all bins that are >= the value of tt
                         filterTT(internalDF, origin, deptime, destination, tt)
-                    #Once the origin and deptime have been placed, add all remaining destinations to the applicable threshold lists
-                    else:
-                        filterTT(internalDF, origin, deptime, destination, tt)
+                #If origin has been found but deptime has not been, then do the following
+                elif deptime not in internalDF[origin]:
+                    internalDF[origin][deptime] = {}
+                    # If this orgn + dptm combo has not been arrived at previously, add the threshold keys
+                    addThresholds(internalDF, origin, deptime)
+                    # Place the tt and destination into all bins that are >= the value of tt
+                    filterTT(internalDF, origin, deptime, destination, tt)
+                #Once the origin and deptime have been placed, add all remaining destinations to the applicable threshold lists
+                elif origin in internalDF and deptime in internalDF[origin]:
+                    filterTT(internalDF, origin, deptime, destination, tt)
 
     print("Created Internal DF and Made Destination Lists by Threshold")
     return internalDF
@@ -175,22 +171,35 @@ def filterTT(internal_df, origin, deptime, destination, tt):
     #Create a list of thresholds that this destination can be reached in <= time
     applicable_thresh_list = []
     for item in threshold_list:
-        if int(tt) <= int(item):
+        #OTP puts TT in minutes then rounds down, the int() func. always rounds down.
+        #Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
+        minbin = int(int(tt)/60)
+        minthresh = int(int(item)/60)
+        if minbin < minthresh:
+            print('minbin:', minbin, 'minthresh', minthresh)
             applicable_thresh_list.append(item)
     #Once the applicable thresholds have been found, place destination into lists
-    for thresh in applicable_thresh_list:
+    for thresh in sorted(applicable_thresh_list):
         internal_df[origin][deptime][thresh].append(destination)
+
+# #Sort each of the nested dictionaries
+# def sortMe(internal_df):
+#     ordered_origins = OrderedDict(sorted(internal_df.items()))
+#     for origin, outter in ordered_origins.items():
+#         ordered_deptime = OrderedDict(sorted(ordered_origins[origin].items()))
+#
+#     return ordered_deptime
 
 #Each orgn_dptm_threshold has a list of destinations that can be reached.
 #Sum the jobs associated with each destination and write out the rows
 def sumJobs(internal_df):
     for origin, outter in internal_df.items():
         for dptm, inner in internal_df[origin].items():
-            for thresh, dest_list in internal_df[origin][dptm].items():
+            for thresh, dest_list in sorted(internal_df[origin][dptm].items()):
                 count = 0
                 for dest in dest_list:
                     count = count + int(jobsDict[dest])
-                entry = {'origin': origin, 'deptime': dptm, 'threshold': thresh, 'jobs': count}
+                entry = {'label': origin, 'deptime': dptm, 'threshold': thresh, 'jobs': count}
                 writer.writerow(entry)
 
 
@@ -209,7 +218,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Create output file
-    fieldnames = ['origin', 'deptime', 'threshold', 'jobs']
+    fieldnames = ['label', 'deptime', 'threshold', 'jobs']
     writer = mkOutput(curtime, fieldnames, 'tt2access')
 
     #Make input dictionaries
@@ -222,6 +231,7 @@ if __name__ == '__main__':
                       '4500', '4800', '5100', '5400']
 
     internalDF = restructureDF(ttDict)
+    #internalDFSort = sortMe(internalDF)
     sumJobs(internalDF)
 
 #-----END-----
