@@ -100,6 +100,7 @@ def makeNestedDict(file, outter_val, inner_val):
 
         elif row['deptime'] not in nest[row[outter_val]][row[inner_val]]:
                 nest[row[outter_val]][row[inner_val]][row['deptime']] = row['traveltime']
+
     print("Created Nested Dictionary:", outter_val)
     return nest
 
@@ -134,6 +135,7 @@ def calcPercentile(dest_dict, dest):
 #select PNR -> select destination -> select origin -> select destination departure time
 def linkPaths(key_PNR, dest_dict, p2o_dict):
     #Extract the inner dict with matching PNR from the p2o dict.
+    print('key PNR:', key_PNR)
     orgn_dict = p2o_dict[key_PNR]
     #print('orgn_dict: ', orgn_dict)
     #3. Iterate through the different destination for the PNR that has been selected
@@ -145,6 +147,7 @@ def linkPaths(key_PNR, dest_dict, p2o_dict):
         #print("PNR:", key_PNR, "Destination:", dest, "Percentile:", dest_tile)
         #4. Iterate through origin paths for the selected PNR + destination path selected by outter for loop
         origin_list = [k for k in orgn_dict.keys()]
+        print('origin list:', origin_list)
         for orgn in origin_list:
             for or_deptime, or_traveltime in orgn_dict[orgn].items():
                 # 5. Check that origin deptime + tt ~= destination deptime
@@ -155,13 +158,16 @@ def linkPaths(key_PNR, dest_dict, p2o_dict):
                     # checking that the deptime is within 5 min of depsum.
                     # Make sure to exclude paths where the destination is actually not reachable by the PNR
                     if int(dest_traveltime) <= dest_tile and int(dest_traveltime) != 2147483647:
+                        print('here1')
                         #Make sure that O2PNR and PNR2D paths are within 15 minutes of PNR deptime.
                         windowMin = convert2Sec(dest_deptime)
-                        windowMax = convert2Sec(dest_deptime) + 900
-                        if windowMin <= depsum <= windowMax:
+                        #windowMax = convert2Sec(dest_deptime) + 900
+                        print('min:', windowMin, 'depsum:', depsum) #, 'max', windowMax)
+                        if windowMin <= depsum: #<= windowMax:
+                            print('here2')
                             path_TT = int(or_traveltime) + int(dest_traveltime)
                             #7 This path is viable, add to list.
-                            #print("Origin:",orgn, "PNR:", key_PNR, "Dest:", dest, "Deptime:", or_deptime, "TT:", path_TT)
+                            print("Origin:",orgn, "PNR:", key_PNR, "Dest:", dest, "Deptime:", or_deptime, "TT:", path_TT)
                             #elapsedTime()
                             #print("send to all_paths_dict")
                             add2AllPathsDict(orgn, dest, key_PNR, or_deptime, path_TT)
@@ -237,6 +243,7 @@ def findSP(deptime_list, all_paths_dict):
     #Each "row" is a separate origin
     for origin, outter in all_paths_dict.items():
         for destination, inner in all_paths_dict[origin].items():
+            print('origin:', origin, 'dest:', destination)
             #now use a method to select one deptime and compare across all PNRs and then for each departure time
             #you may get that different PNR result in the shortest travel time.
             for dptm in deptime_list:
@@ -310,7 +317,7 @@ def writeSP(spDict):
         for deptime, inner in spDict[origin].items():
             for destination, locations in spDict[origin][deptime].items():
                 for pnr, tt in spDict[origin][deptime][destination].items():
-                    entry = {'origin': origin, 'deptime': deptime, 'destination': destination, 'PNR': pnr, 'minTT': tt}
+                    entry = {'origin': origin, 'deptime': deptime, 'destination': destination, 'PNR': pnr, 'traveltime': tt}
                     writer.writerow(entry)
     print("Shortest Paths Results File Written")
 #Not in use currently
@@ -346,7 +353,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Create two files, enumerated and averaged by deptime.
-    fieldnames = ['origin', 'deptime', 'destination', 'PNR', 'minTT']
+    fieldnames = ['origin', 'deptime', 'destination', 'PNR', 'traveltime']
     writer = mkOutput(curtime, fieldnames, 'paths_linked')
 
     # fieldnames2 = ['origin', 'destination', 'avgTT']
