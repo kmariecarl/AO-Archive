@@ -3,13 +3,16 @@
 #This program shall be run after the creation of a TT matrix and before the linking of matrices by TTMatrixLink.py
 
 #LOGIC:
-#1. import one matrix, only one argument
+#1. import one matrix
 #2. Row by row, check if PNR has been added to PNR list
-#3. Look for that PNR
+#3. Create pnr-list then seek to top of dictreader object
+#4. Loop through pnr_list and the entire matrix to find rows that match selected pnr
+#5. Seek to the top of the matrix dict object for each new pnr item
+#6. Close matrix file
 #NOTES
 
 
-#EXAMPLE USAGE: kristincarlson$ python...
+#EXAMPLE USAGE: kristincarlson$ python matrixBreaker.py -matrix o2pnr_tt-results.csv -pnr 'destination' -connect 'origin'
 
 #################################
 #           IMPORTS             #
@@ -18,10 +21,6 @@ import csv
 import datetime
 import time
 import argparse
-import numpy
-import timeit
-import zipfile
-#import bz2
 
 #################################
 #           FUNCTIONS           #
@@ -35,11 +34,20 @@ def startTimer():
     currentTime = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
     return start_time, currentTime
 
+#This consecutively writes out .txt files pertaining to each PNR
 def mkOutput(fieldnames, pnr_num, name, currentTime):
     outfile = open('PNR_{}_{}_{}.txt'.format(pnr_num, name, currentTime), 'w')
     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
     writer.writeheader()
     return writer
+
+#This function writes out a list of PNR labels that will be used by TTMatrixLink.py as an argument
+def writePNRList(list, currentTime):
+    with open('PNRList_{}.txt'.format(currentTime), 'w') as outlist:
+        for item in list:
+            outlist.write(item)
+            outlist.write(',')
+
 
 #################################
 #           OPERATIONS          #
@@ -87,6 +95,7 @@ if __name__ == '__main__':
             if row_again[pnr_name_field] == item:
                 writer.writerow(row_again)
         f.seek(0)
+    writePNRList(pnr_list, curtime)
     f.close()
 
 
