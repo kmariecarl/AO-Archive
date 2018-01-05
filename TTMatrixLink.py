@@ -24,6 +24,9 @@
 #Program assumes that each PNR is associated with all destinations whether or not the destinations can be reachec
 #or not in the given travel time.
 
+#Despite the refactoring to segment processes by PNR, I am maintainin the data structure format where the PNR stays as
+#the outter dict key even though that means there will only be one outter dict key.
+
 #EXAMPLE USAGE: kristincarlson$ python TTMatrixLink.py -o2p o2pnr.txt -p2d pnr2d.txt
 
 #################################
@@ -34,9 +37,8 @@ import datetime
 import time
 import argparse
 import numpy
-import timeit
-import zipfile
-#import bz2
+import glob
+
 
 #################################
 #           FUNCTIONS           #
@@ -65,13 +67,30 @@ def elapsedTime():
     elapsed_time = time.time() - start_time
     print("Elapsed Time: ", elapsed_time)
 
+#This function reads in the PNRList file created by matrixBreaker.py
+def readList(file):
+    with open(file, 'r') as infile:
+        list = []
+        for item in infile:
+            list.append(item)
+    return list
+
 def mkOutput(currentTime, fieldnames, name):
     outfile = open('output_{}_{}.txt'.format(name,curtime), 'w')
     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
     writer.writeheader()
     return writer
 
-#Make a dictReader object from input file
+#Make a dictReader object for each input file, one for origin to PNR and another for PNR to destination
+def readFiles(pnr):
+    #Glob module is used to grab the file name despite the curtime extension from matrixBreaker
+    with open(glob.glob('PNR_{}_origin*.txt'.format(pnr)), 'r') as input_or:
+        reader_or = csv.DictReader(input_or)
+        with open(glob.glob('PNR_{}_destination*.txt'.format(pnr)), 'r') as input_dest:
+            reader_dest = csv.DictReader(input_dest)
+    return reader_or, reader_dest
+
+
 #A triple nested dictionary is the product of this function
 #{origin:{destination:{deptime:traveltime,
 #                      deptime:traveltime,
@@ -80,13 +99,10 @@ def mkOutput(currentTime, fieldnames, name):
 #                      deptime:traveltime,
 #                      deptime:traveltime}}
 #origins:...
-
 def makeNestedDict(file, outter_val, inner_val):
-    input = open(file, 'r')
-    reader = csv.DictReader(input)
     #Initiate outter dict
     nest = {}
-    for row in reader:
+    for row in file:
         if row[outter_val] not in nest:
             #Initiate inner dict
             nest[row[outter_val]] = {}
@@ -117,7 +133,7 @@ def makeList(p2o_dict):
                     list.append(deptime)
     print("All possible departure times list:", list)
     return list
-#Check if list contains all the same values
+#Check if list contains all Maxtime values (all the same values)
 def allSame(items):
     return all(x == items[0] for x in items)
 
@@ -135,10 +151,11 @@ def calcPercentile(dest_dict, dest):
 
 #Every use of this function accounts for all paths connecting through the selected PNR.
 #select PNR -> select destination -> select origin -> select destination departure time
-def linkPaths(key_PNR, dest_dict, p2o_dict):
+def linkPaths(key_PNR, p2d_dict, p2o_dict):
     #Extract the inner dict with matching PNR from the p2o dict.
-    print('Connecting path to PNR#', key_PNR)
+    print('Connecting paths to PNR#', key_PNR)
     orgn_dict = p2o_dict[key_PNR]
+    dest_dict = p2d_dict[key_PNR]
     #print('orgn_dict: ', orgn_dict)
     #3. Iterate through the different destination for the PNR that has been selected
     dest_list = [i for i in dest_dict.keys()]
@@ -205,6 +222,9 @@ def linkPaths(key_PNR, dest_dict, p2o_dict):
 #                                        or_deptime:path_TT}}}}
 
 #Function for nesting all viable path information
+#Here I may need to add a way to write over existing content if a shorter path between OD pair is found.
+#Each origin_destination_departuretime combo shoulc have a min TT and the associated PNR attached, thus the PnR and TT get
+#overwritten if new info comes in at the next PNR iteration.
 def add2AllPathsDict(origin, destination, PNR, or_deptime, path_TT):
     if origin not in allPathsDict:
         allPathsDict[origin] = {}
@@ -353,39 +373,45 @@ if __name__ == '__main__':
     start_time, curtime = startTimer()
     # Parameterize file paths
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o2p', '--O2PNR_FILE', required=True, default=None)
-    parser.add_argument('-p2d', '--PNR2D_FILE', required=True, default=None)
+    parser.add_argument('-pnr', '--PNRLIST_FILE', required=True, default=None)
+    parser.add_argument('-deptimes', '--DEPTIMES_FILE', required=True, default=None)
+    #parser.add_argument('-o2p', '--O2PNR_FILE', required=True, default=None)
+    #parser.add_argument('-p2d', '--PNR2D_FILE', required=True, default=None)
     args = parser.parse_args()
 
-    #Create two files, enumerated and averaged by deptime.
-    fieldnames = ['origin', 'deptime', 'destination', 'PNR', 'traveltime']
-    writer = mkOutput(curtime, fieldnames, 'paths_linked')
-
-    #Temporarily changing the input format of the PNR to D file as a zip file where the results are read in from the
-    #two lines below.
-    # myzip = bz2.BZ2File('Transit_PNR_D_TT_Calc.csv.bz2', 'r')
-    # pnr2d_file = myzip.read('Transit_PNR_D_TT_Calc-results.csv')
-    #Make nested input dictionaries
-    p2oDict = makeNestedDict(args.O2PNR_FILE, 'destination', 'origin')
-    p2dDict = makeNestedDict(args.PNR2D_FILE, 'origin', 'destination')
-    #Use the line below and erase zipfile lines above if pnr2d file is not a zip file.
-    p2dDict = makeNestedDict(args.PNR2D_FILE, 'origin', 'destination')
-    deptimeList = makeList(p2oDict)
+    #To handle large datasets, segment processes by PNR
+    #Read in the PNR_list file
+    pnr_list = readList(args.PNRLIST_FILE)
+    #Provide a way to create a list of departure times using matrixBreaker
+    #Overarching deptimeList
+    deptimeList = readList(args.DEPTIMES_FILE)
 
     #Initiate all_paths_dict
     allPathsDict ={}
     #Initiate shortest paths dict
     spDict = {}
 
-    #1. Grab a PNR connected to destinations dict
-    for key_PNR, dest_dict in p2dDict.items():
-        #2. Grab the same PNR connected to origins and link paths if criteria are met
-        linkPaths(key_PNR, dest_dict, p2oDict)
+    #Then loop through the list and perform the following lines of code for each PNR...
+    for pnr in pnr_list:
+        or_dict, dst_dict = readFiles(pnr) #remeber to close these files at thge end of iteration
+        #Make nested input dictionaries
+        p2oDict = makeNestedDict(or_dict, 'destination', 'origin')
+        p2dDict = makeNestedDict(dst_dict, 'origin', 'destination')
+
+        #1. Grab a PNR connected to destinations dict
+        #for key_PNR, dest_dict in p2dDict.items():
+            #2. Grab the same PNR connected to origins and link paths if criteria are met
+            #linkPaths(key_PNR, dest_dict, p2oDict)
+        linkPaths(pnr, p2dDict, p2oDict) #LinkPaths sends to AllPathsDict function
         runtime = time.time() - start_time
         #This prints each time a PNR has been connected to all origins and destinations
         print("Paths linked. Runtime =", runtime )
+
     findSP(deptimeList, allPathsDict)
     for row, value in spDict.items():
         print(row, value)
     countPNRS(spDict)
+    #Initiate the linked paths file.
+    fieldnames = ['origin', 'deptime', 'destination', 'PNR', 'traveltime']
+    writer = mkOutput(curtime, fieldnames, 'paths_linked')
     writeSP(spDict)
