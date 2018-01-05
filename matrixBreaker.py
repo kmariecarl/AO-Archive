@@ -48,6 +48,13 @@ def writePNRList(list, currentTime):
             outlist.write(item)
             outlist.write(',')
 
+#This function writes out a list of departure times that will be used by TTMatrixLink.py as an argument
+def writeDeptimes(list, currentTime):
+    with open('Deptimes_{}.txt'.format(currentTime), 'w') as outlist:
+        for item in list:
+            outlist.write(item)
+            outlist.write(',')
+
 
 #################################
 #           OPERATIONS          #
@@ -70,6 +77,9 @@ if __name__ == '__main__':
     #Create pnr_list
     pnr_list = []
 
+    #Create deptimes list
+    deptimes_list = []
+
     #Reassign PNR_FIELD to string label
     pnr_name_field = str(args.PNR_FIELD)
     print('pnr-field-name:', pnr_name_field)
@@ -85,6 +95,8 @@ if __name__ == '__main__':
         if row[pnr_name_field] not in pnr_list:
             pnr_list.append(row[pnr_name_field])
             print('pnr_list:', pnr_list)
+        if row['deptime'] not in deptimes_list:
+            deptimes_list.append(row['deptime'])
 
     f.seek(0)
     for item in pnr_list:
