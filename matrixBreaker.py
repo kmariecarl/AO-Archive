@@ -35,8 +35,8 @@ def startTimer():
     return start_time, currentTime
 
 #This consecutively writes out .txt files pertaining to each PNR
-def mkOutput(fieldnames, pnr_num, name, currentTime):
-    outfile = open('PNR_{}_{}_{}.txt'.format(pnr_num, name, currentTime), 'w')
+def mkOutput(fieldnames, pnr_num, name):
+    outfile = open('PNR_{}_{}.txt'.format(pnr_num, name), 'w')
     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
     writer.writeheader()
     return writer
@@ -101,13 +101,14 @@ if __name__ == '__main__':
     f.seek(0)
     for item in pnr_list:
         # Initiate a new file
-        writer = mkOutput(fieldnames, item, connect, curtime)
+        writer = mkOutput(fieldnames, item, connect)
         # Cycle through the entire input matrix and add rows to mkOutput file that match the selected PNR
         for row_again in reader:
             if row_again[pnr_name_field] == item:
                 writer.writerow(row_again)
         f.seek(0)
     writePNRList(pnr_list, curtime)
+    writeDeptimes(deptimes_list, curtime)
     f.close()
 
 
