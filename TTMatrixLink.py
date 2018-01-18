@@ -27,7 +27,7 @@
 #Despite the refactoring to segment processes by PNR, I am maintainin the data structure format where the PNR stays as
 #the outter dict key even though that means there will only be one outter dict key.
 
-#EXAMPLE USAGE: kristincarlson$ python TTMatrixLink.py -o2p o2pnr.txt -p2d pnr2d.txt
+#EXAMPLE USAGE: kristincarlson$ python TTMatrixLink.py -pnr PNRList_xxx.txt -deptimes Deptimes_xxx.txt
 
 #################################
 #           IMPORTS             #
@@ -67,12 +67,16 @@ def elapsedTime():
     elapsed_time = time.time() - start_time
     print("Elapsed Time: ", elapsed_time)
 
-#This function reads in the PNRList file created by matrixBreaker.py
+#This function reads in the PNRList and Deptimes files created by matrixBreaker.py
 def readList(file):
     with open(file, 'r') as infile:
+        csvreader = csv.reader(infile, delimiter=',')
         list = []
-        for item in infile:
-            list.append(item)
+        for item in csvreader: #Each item is actually the entire list of PNRs or deptimes.
+            for val in item: #Each val is the PNR or deptime
+                if val != '': #The last val is empty due to the matrixBreaker output format
+                    list.append(str(val))
+    print("PNR or Deptimes List:", list)
     return list
 
 def mkOutput(currentTime, fieldnames, name):
@@ -81,14 +85,24 @@ def mkOutput(currentTime, fieldnames, name):
     writer.writeheader()
     return writer
 
-#Make a dictReader object for each input file, one for origin to PNR and another for PNR to destination
-def readFiles(pnr):
-    #Glob module is used to grab the file name despite the curtime extension from matrixBreaker
-    with open(glob.glob('PNR_{}_origin*.txt'.format(pnr)), 'r') as input_or:
-        reader_or = csv.DictReader(input_or)
-        with open(glob.glob('PNR_{}_destination*.txt'.format(pnr)), 'r') as input_dest:
-            reader_dest = csv.DictReader(input_dest)
-    return reader_or, reader_dest
+# #Make a dictReader object for each input file, one for origin to PNR and another for PNR to destination
+# def readFiles(pnr):
+#     #Glob module is used to grab the file name despite the curtime extension from matrixBreaker
+#     #with open(glob.glob(name_string*".txt"), 'r') as input_or:
+#
+#     # input_or = open('PNR_{}_origin.txt'.format(pnr), 'r')
+#     # reader_or = csv.DictReader(input_or)
+#     # input_or.close()
+#     with open ('PNR_{}_origin.txt'.format(pnr), 'r') as input_or:
+#         reader_or = csv.DictReader(input_or)
+#     #
+#     # input_dest = open('PNR_{}_destination.txt'.format(pnr), 'r')
+#     # reader_dest = csv.DictReader(input_dest)
+#     # input_dest.close()
+#     with open('PNR_{}_destination.txt'.format(pnr), 'r') as input_dest:
+#         reader_dest = csv.DictReader(input_dest)
+#
+#     return reader_or, reader_dest
 
 
 #A triple nested dictionary is the product of this function
@@ -99,40 +113,43 @@ def readFiles(pnr):
 #                      deptime:traveltime,
 #                      deptime:traveltime}}
 #origins:...
-def makeNestedDict(file, outter_val, inner_val):
-    #Initiate outter dict
-    nest = {}
-    for row in file:
-        if row[outter_val] not in nest:
-            #Initiate inner dict
-            nest[row[outter_val]] = {}
-            if row[inner_val] not in nest[row[outter_val]]:
+def makeNestedDict(pnr, name, outter_val, inner_val):
+    with open ('PNR_{}_{}.txt'.format(pnr, name), 'r') as input:
+        reader = csv.DictReader(input)
+        #
+        #Initiate outter dict
+        nest = {}
+        for row in reader:
+            if row[outter_val] not in nest:
+                #Initiate inner dict
+                nest[row[outter_val]] = {}
+                if row[inner_val] not in nest[row[outter_val]]:
+                    nest[row[outter_val]][row[inner_val]] = {}
+                    if row['deptime'] not in nest[row[outter_val]][row[inner_val]]:
+                        nest[row[outter_val]][row[inner_val]][row['deptime']] = row['traveltime']
+
+            elif row[inner_val] not in nest[row[outter_val]]:
                 nest[row[outter_val]][row[inner_val]] = {}
                 if row['deptime'] not in nest[row[outter_val]][row[inner_val]]:
                     nest[row[outter_val]][row[inner_val]][row['deptime']] = row['traveltime']
 
-        elif row[inner_val] not in nest[row[outter_val]]:
-            nest[row[outter_val]][row[inner_val]] = {}
-            if row['deptime'] not in nest[row[outter_val]][row[inner_val]]:
-                nest[row[outter_val]][row[inner_val]][row['deptime']] = row['traveltime']
+            elif row['deptime'] not in nest[row[outter_val]][row[inner_val]]:
+                    nest[row[outter_val]][row[inner_val]][row['deptime']] = row['traveltime']
 
-        elif row['deptime'] not in nest[row[outter_val]][row[inner_val]]:
-                nest[row[outter_val]][row[inner_val]][row['deptime']] = row['traveltime']
-
-    print("Created Nested Dictionary:", outter_val)
-    return nest
+        print("Created Nested Dictionary:", outter_val)
+        return nest
 
 #Return a list of departure times for which each OD pair may have different total travel times based on
 #the departure time from the origin.
-def makeList(p2o_dict):
-    list = []
-    for pnr, origins in p2o_dict.items():
-        for origin, timing in p2o_dict[pnr].items():
-            for deptime, tt in p2o_dict[pnr][origin].items():
-                if deptime not in list:
-                    list.append(deptime)
-    print("All possible departure times list:", list)
-    return list
+# def makeList(p2o_dict):
+#     list = []
+#     for pnr, origins in p2o_dict.items():
+#         for origin, timing in p2o_dict[pnr].items():
+#             for deptime, tt in p2o_dict[pnr][origin].items():
+#                 if deptime not in list:
+#                     list.append(deptime)
+#     print("All possible departure times list:", list)
+#     return list
 #Check if list contains all Maxtime values (all the same values)
 def allSame(items):
     return all(x == items[0] for x in items)
@@ -154,42 +171,42 @@ def calcPercentile(dest_dict, dest):
 def linkPaths(key_PNR, p2d_dict, p2o_dict):
     #Extract the inner dict with matching PNR from the p2o dict.
     print('Connecting paths to PNR#', key_PNR)
-    orgn_dict = p2o_dict[key_PNR]
-    dest_dict = p2d_dict[key_PNR]
-    #print('orgn_dict: ', orgn_dict)
-    #3. Iterate through the different destination for the PNR that has been selected
-    dest_list = [i for i in dest_dict.keys()]
-    for dest in dest_list:
-        #print("dest: ", dest)
-        #Find 15th percentile TT for this destination
-        dest_tile = calcPercentile(dest_dict, dest)
-        #print("PNR:", key_PNR, "Destination:", dest, "Percentile:", dest_tile)
-        #4. Iterate through origin paths for the selected PNR + destination path selected by outter for loop
-        origin_list = [k for k in orgn_dict.keys()]
-        #print('origin list:', origin_list)
-        for orgn in origin_list:
-            for or_deptime, or_traveltime in orgn_dict[orgn].items():
-                # 5. Check that origin deptime + tt ~= destination deptime
-                depsum = convert2Sec(or_deptime) + int(or_traveltime)
-                #6. Create PNR transfer window of 10 minutes
-                for dest_deptime, dest_traveltime in dest_dict[dest].items():
-                    # Check if path TT is in the 85th percentile of lowest TTs before
-                    # checking that the deptime is within 5 min of depsum.
-                    # Make sure to exclude paths where the destination is actually not reachable by the PNR
-                    if int(dest_traveltime) <= dest_tile and int(dest_traveltime) != 2147483647:
-                        #print('here1')
-                        #Make sure that O2PNR and PNR2D paths are within 15 minutes of PNR deptime.
-                        windowMin = convert2Sec(dest_deptime)
-                        #windowMax = convert2Sec(dest_deptime) + 900
-                        #print('min:', windowMin, 'depsum:', depsum) #, 'max', windowMax)
-                        if windowMin <= depsum: #<= windowMax:
-                            #print('here2')
-                            path_TT = int(or_traveltime) + int(dest_traveltime)
-                            #7 This path is viable, add to list.
-                            #print("Origin:",orgn, "PNR:", key_PNR, "Dest:", dest, "Deptime:", or_deptime, "TT:", path_TT)
-                            #elapsedTime()
-                            #print("send to all_paths_dict")
-                            add2AllPathsDict(orgn, dest, key_PNR, or_deptime, path_TT)
+    for or_key, orgn_dict in p2o_dict.items(): #Breaking the PNR key out from the values dictionary, we don't need to do
+        #anything with the key because there is only one. Same for destination dictionary.
+        for dest_key, dest_dict in p2d_dict.items():
+            #print('Dest_key', dest_key)
+            #print('dest_dict', dest_dict)
+            #print('or_key and dest_key should match', or_key, dest_key)
+        #3. Iterate through the different destinations for the PNR that has been selected
+            dest_list = [i for i in dest_dict.keys()]
+            #print('dest_list should be geoid10', dest_list)
+            for dest in dest_list:
+                #Find 15th percentile TT for this destination
+                dest_tile = calcPercentile(dest_dict, dest)
+                #4. Iterate through origin paths for the selected PNR + destination path selected by outter for loop
+                origin_list = [k for k in orgn_dict.keys()]
+
+                for orgn in origin_list:
+                    for or_deptime, or_traveltime in orgn_dict[orgn].items():
+                        # 5. Check that origin deptime + tt ~= destination deptime
+                        depsum = convert2Sec(or_deptime) + int(or_traveltime)
+                        #6. Create PNR transfer window of 10 minutes
+                        for dest_deptime, dest_traveltime in dest_dict[dest].items():
+                            # Check if path TT is in the 85th percentile of lowest TTs before
+                            # checking that the deptime is within 5 min of depsum.
+                            # Make sure to exclude paths where the destination is actually not reachable by the PNR
+                            if int(dest_traveltime) <= dest_tile and int(dest_traveltime) != 2147483647:
+                                #print('here1')
+                                #Make sure that O2PNR and PNR2D paths are within 15 minutes of PNR deptime.
+                                windowMin = convert2Sec(dest_deptime)
+                                #windowMax = convert2Sec(dest_deptime) + 900
+                                #print('min:', windowMin, 'depsum:', depsum) #, 'max', windowMax)
+                                if windowMin <= depsum: #<= windowMax:
+                                    #print('here2')
+                                    path_TT = int(or_traveltime) + int(dest_traveltime)
+                                    #7 This path is viable, add to list.
+                                    add2AllPathsDict(orgn, dest, key_PNR, or_deptime, path_TT)
+                #print("All possible origins connected to destination {} through PNR {}".format(dest, key_PNR))
 
 
 
@@ -259,34 +276,50 @@ def add2AllPathsDict(origin, destination, PNR, or_deptime, path_TT):
     else:
         allPathsDict[origin][destination][PNR][or_deptime] = path_TT
 
-
 #Take the all_paths_dict and find the shortest path between all OD pairs.
 def findSP(deptime_list, all_paths_dict):
     print("Finding shortest paths between OD pairs")
     #Each "row" is a separate origin
     for origin, outter in all_paths_dict.items():
+        print('origin', origin)
+        #print('outter', outter)
+        prev_time = time.time()
         for destination, inner in all_paths_dict[origin].items():
+            print("Destination", destination)
+            #print('inner', inner)
             #print('origin:', origin, 'dest:', destination)
             #now use a method to select one deptime and compare across all PNRs and then for each departure time
             #you may get that different PNR result in the shortest travel time.
             for dptm in deptime_list:
+                #print('dptm', dptm)
                 dptm_dict = {} #where key=PNR: value=TT
                 #For each deptime make a dictionary of all PNRs: tt, once the dict is created, run min().
                 for PNR, timing in all_paths_dict[origin][destination].items():
+                    #print('PNR', PNR)
+                    #print("timing dictionary", timing)
                     if dptm in all_paths_dict[origin][destination][PNR]:
+                        #print('here1')
                         dptm_dict[PNR] = all_paths_dict[origin][destination][PNR][dptm]
+                        #print("dptm_dict", dptm_dict)
+                    #If the particular OD + PNR combo does not have a path in the allPathsDict for the selected
+                    #departure time, then move to the next PNR -- not to the next if statement
 
-                    #print("dptm_dict: ", dptm_dict)
-                    if any(dptm_dict) == True:
-                        #print("Found a OD + PNR combo that doesn't have a SP for the selected departure time")
-                        minPNR = min(dptm_dict, key=dptm_dict.get)
-                        #print("minPNR: ", minPNR)
-                        minTT = dptm_dict[minPNR]
-                        #minTT = all_paths_dict[origin][destination][minPNR][dptm]
-                        #So far haven't addressed if two PNRs have equal and minimal TTs.
-                        #print("SP between", origin, "and", destination, "uses PNR", minPNR, "TT=", minTT)
-                        #elapsedTime()
-                        add2SPDict(origin, dptm, destination, minPNR, minTT)
+                #print("dptm_dict: ", dptm_dict)
+                if any(dptm_dict) == True:
+                    #print('here2')
+                    #print("Found a OD + PNR combo that doesn't have a SP for the selected departure time")
+                    minPNR = min(dptm_dict, key=dptm_dict.get)
+                    #print("minPNR: ", minPNR)
+                    minTT = dptm_dict[minPNR]
+                    #minTT = all_paths_dict[origin][destination][minPNR][dptm]
+                    #So far haven't addressed if two PNRs have equal and minimal TTs.
+                    print("SP between", origin, "and", destination, "uses PNR", minPNR, "TT=", minTT)
+                    #elapsedTime()
+                    add2SPDict(origin, dptm, destination, minPNR, minTT)
+
+        rep_runtime = time.time() - prev_time
+        print("Origin {} connected to PNRs and Destinations in {} seconds".format(origin, rep_runtime))
+    #print('Shortest paths dict:', spDict)
     print("Shortest Paths Are Found")
 
 def add2SPDict(origin, dptm, destination, pnr, sp_tt):
@@ -382,9 +415,11 @@ if __name__ == '__main__':
     #To handle large datasets, segment processes by PNR
     #Read in the PNR_list file
     pnr_list = readList(args.PNRLIST_FILE)
+    #print("pnr list:", pnr_list)
     #Provide a way to create a list of departure times using matrixBreaker
     #Overarching deptimeList
     deptimeList = readList(args.DEPTIMES_FILE)
+    #print('deptime list', deptimeList)
 
     #Initiate all_paths_dict
     allPathsDict ={}
@@ -393,10 +428,10 @@ if __name__ == '__main__':
 
     #Then loop through the list and perform the following lines of code for each PNR...
     for pnr in pnr_list:
-        or_dict, dst_dict = readFiles(pnr) #remeber to close these files at thge end of iteration
+        #or_dict, dst_dict = readFiles(pnr) #remeber to close these files at thge end of iteration
         #Make nested input dictionaries
-        p2oDict = makeNestedDict(or_dict, 'destination', 'origin')
-        p2dDict = makeNestedDict(dst_dict, 'origin', 'destination')
+        p2oDict = makeNestedDict(pnr,'origin', 'destination', 'origin')
+        p2dDict = makeNestedDict(pnr, 'destination', 'origin', 'destination')
 
         #1. Grab a PNR connected to destinations dict
         #for key_PNR, dest_dict in p2dDict.items():
@@ -406,6 +441,8 @@ if __name__ == '__main__':
         runtime = time.time() - start_time
         #This prints each time a PNR has been connected to all origins and destinations
         print("Paths linked. Runtime =", runtime )
+        #Close PNR files
+
 
     findSP(deptimeList, allPathsDict)
     for row, value in spDict.items():
@@ -415,3 +452,4 @@ if __name__ == '__main__':
     fieldnames = ['origin', 'deptime', 'destination', 'PNR', 'traveltime']
     writer = mkOutput(curtime, fieldnames, 'paths_linked')
     writeSP(spDict)
+    elapsedTime()
