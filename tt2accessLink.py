@@ -162,6 +162,7 @@ def restructureDF(tt_dict):
                 #Once the origin and deptime have been placed, add all remaining destinations to the applicable threshold lists
                 elif origin in internalDF and deptime in internalDF[origin]:
                     filterTT(internalDF, origin, deptime, destination, tt)
+        print("Origin {} filtered to appropriate thresholds".format(origin))
 
     print("Created Internal DF and Made Destination Lists by Threshold")
     return internalDF
@@ -176,7 +177,7 @@ def filterTT(internal_df, origin, deptime, destination, tt):
         minbin = int(int(tt)/60)
         minthresh = int(int(item)/60)
         if minbin < minthresh:
-            print('minbin:', minbin, 'minthresh', minthresh)
+            #print('minbin:', minbin, 'minthresh', minthresh)
             applicable_thresh_list.append(item)
     #Once the applicable thresholds have been found, place destination into lists
     for thresh in sorted(applicable_thresh_list):
@@ -201,6 +202,7 @@ def sumJobs(internal_df):
                     count = count + int(jobsDict[dest])
                 entry = {'label': origin, 'deptime': dptm, 'threshold': thresh, 'jobs': count}
                 writer.writerow(entry)
+        print("Origin {} matched to jobs".format(origin))
 
 
 #################################
