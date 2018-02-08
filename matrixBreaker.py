@@ -1,4 +1,4 @@
-#This program breaks a Travel Time matrix into separate .csv/.txt files for each origin or destination.
+
 #Application is used to break large Origin to PNR and PNR to Destination matrices into files by PNR and departure time.
 #This program shall be run after the creation of a TT matrix and before the linking of matrices by TTMatrixLink.py
 
@@ -7,8 +7,9 @@
 #2. Row by row, check if PNR has been added to PNR list, and if deptime has been added to deptime list.
 #3. Create pnr-list and deptime-list then seek to top of dictreader object
 #4. Loop through pnr_list and deptime-list and the entire matrix to find rows that match selected pnr and deptime
-#5. Seek to the top of the matrix dict object for each new pnr item
+#5. Seek to the top of the matrix dict object for each new pnr item and deptime item
 #6. Close matrix file
+
 #NOTES
 #Add an optional arguement to only break out one PNR
 
@@ -16,34 +17,43 @@
 #origin,destination,deptime,traveltime
 
 
-#EXAMPLE USAGE: kristincarlson$ python matrixBreaker.py -matrix o2pnr_tt-results.csv -pnr 'destination' -connect 'origin'
-#-pick '217' -split ./split/
-#The last two arguments are optional.
+
+# EXAMPLE USAGE: kristincarlson$ python matrixBreaker.py -matrix o2pnr_tt-results.csv -pnr 'destination' -connect 'origin'
+# -pick '217' -split ./split/
+# The last two arguments are optional.
 #################################
 #           IMPORTS             #
 #################################
-import csv
-import datetime
-import time
 import argparse
-import glob
+import csv
+import matrixLinkModule as mod
+
 
 #################################
 #           FUNCTIONS           #
 #################################
 
-def startTimer():
-    # Start timing
-    #Use start_time for tracking elapsed runtime.
-    start_time = time.time()
-    # Make a variable for the current time for use in writing files.
-    currentTime = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-    return start_time, currentTime
+#A function to find all PNR and deptimes unique to the matrix file.
+def makeLists(matrix, pnr_name_field):
+    #Initiate Lists
+    pnr_list = []
+    deptime_list = []
 
-#A function that prints out the elapsed calculation time
-def elapsedTime():
-    elapsed_time = time.time() - start_time
-    print("Elapsed Time: ", elapsed_time)
+    #Open Matrix file
+    with open(matrix) as f:
+        reader = csv.DictReader(f)
+
+        #Create PNR and Deptime lists
+        for row in reader:
+            #Check if PNR has been added to pnr_list.
+            if row[pnr_name_field] not in pnr_list:
+                pnr_list.append(row[pnr_name_field])
+            #Check if departure time in seconds has been added to deptime_list
+            dep_sec = mod.convert2Sec(row['deptime'])
+            if dep_sec not in deptime_list:
+                deptime_list.append(dep_sec)
+
+    return pnr_list, deptime_list
 
 #Use this function to process a single PNR given a "split" directory
 #COME BACK AND FIX FOR WRITING OUT DEPTIME FILES
@@ -91,55 +101,31 @@ def elapsedTime():
 #             elapsedTime()
 #             print('-------------------------')
 #     print("File written for PNR {}".format(pick))
-
-def processMultiple():
-    #Open Matrix file
-    with open(args.MATRIX_FILE) as f:
+#A function to extract and make files for every PNR listed in the original TT matrix
+def processMultiple(fieldname_list, pnr, deptime_select, matrix, pnr_name_field, connect):
+    # Open Matrix file for every PNR and deptime combo which makes the program run long (40 min for unit test)
+    with open(matrix) as f:
         reader = csv.DictReader(f)
-        #Create PNR and Deptime lists
-        for row in reader:
-            #Check if PNR has been added to pnr_list.
-            if row[pnr_name_field] not in pnr_list:
-                pnr_list.append(row[pnr_name_field])
-                #print('pnr_list:', pnr_list)
-            if row['deptime'] not in deptimes_list:
-                deptimes_list.append(row['deptime'])
-        elapsedTime()
-        f.seek(0)
-        #Make new files for each PNR_deptime combo
-        for PNR in pnr_list:
-            for deptime in deptimes_list:
-                # Initiate a new file
-                writer = mkOutput(fieldnames, PNR, connect, deptime)
-                # Cycle through the entire input matrix and add rows to mkOutput file that match the selected PNR and deptime
-                for row_again in reader:
-                    if row_again[pnr_name_field] == PNR and row_again['deptime'] == deptime:
-                        entry = [row_again['origin'], row_again['destination'], row_again['deptime'], row_again['traveltime']]
-                        writer.writerow(entry)
-                print("File written for PNR {} at deptime {}".format(PNR, deptime))
-                elapsedTime()
-                f.seek(0)
 
-#This consecutively writes out .txt files pertaining to each PNR
-def mkOutput(fieldnames, pnr_num, name, deptime):
-    outfile = open('PNR_{}_{}_{}.txt'.format(pnr_num, name, deptime), 'w', newline='')
-    writer = csv.writer(outfile, delimiter=',')
-    writer.writerow(['origin', 'destination', 'deptime', 'traveltime'])
-    return writer
+        #Initiate output file
+        file_name = 'PNR_{}_{}_{}'.format(pnr, deptime_select, connect)
+        writer = mod.mkOutput(file_name, fieldname_list)
 
-#This function writes out a list of PNR labels that will be used by TTMatrixLink.py as an argument
-def writePNRList(list, currentTime):
-    with open('PNRList_{}.txt'.format(currentTime), 'w') as outlist:
-        for item in list:
-            outlist.write(item)
-            outlist.write(',')
+        # Cycle through the entire input matrix and add rows to mkOutput file that match the selected PNR and deptime
+        for row_again in reader:
+            # #Permanantly convert deptime to seconds
+            deptime_sec = mod.convert2Sec(row_again['deptime'])
+            #If PNR_row == PNR_fromlist and deptime_sec == deptime_select_fromlist:
+            if int(row_again[pnr_name_field]) == int(pnr) and int(deptime_sec) == int(deptime_select):
 
-#This function writes out a list of departure times that will be used by TTMatrixLink.py as an argument
-def writeDeptimes(list, currentTime):
-    with open('Deptimes_{}.txt'.format(currentTime), 'w') as outlist:
-        for item in list:
-            outlist.write(item)
-            outlist.write(',')
+                entry = [row_again['origin'], row_again['destination'], deptime_sec, row_again['traveltime']]
+                writer.writerow(entry)
+
+        print("File written for PNR {} at deptime {}".format(pnr, deptime_select))
+        mod.elapsedTime(START_TIME)
+
+
+
 
 
 #################################
@@ -148,7 +134,7 @@ def writeDeptimes(list, currentTime):
 
 if __name__ == '__main__':
 
-    start_time, curtime = startTimer()
+    START_TIME, curtime = mod.startTimer()
     # Parameterize file paths
     parser = argparse.ArgumentParser()
     #Tell the program which field contains the pnr values, answer is either origin or destination
@@ -159,30 +145,30 @@ if __name__ == '__main__':
     parser.add_argument('-split', '--SPLIT_DIR', required=False, default=None)
     args = parser.parse_args()
 
-
     #Create fieldnames for output files
-    fieldnames = ['origin', 'destination', 'deptime', 'traveltime']
-
-    #Create pnr_list
-    pnr_list = []
-
-    #Create deptimes list
-    deptimes_list = []
+    fieldnameList = ['origin', 'destination', 'deptime', 'traveltime']
 
     #Reassign PNR_FIELD to string label
-    pnr_name_field = str(args.PNR_FIELD) #Will be either 'origin' or 'destination'
-    print('pnr-field-name:', pnr_name_field)
+    pnrNameField = str(args.PNR_FIELD) #Will be either 'origin' or 'destination'
+    print('pnr-field-name:', pnrNameField)
     #Reassign connecting field name to either origin or destination
     connect = str(args.CONNECT_FIELD)
     print('connect-field:', connect)
+
+    pnr_list, deptime_list = makeLists(args.MATRIX_FILE, pnrNameField)
 
     # Add a statement to do the process for only one "picked" PNR
     if args.PICKED_PNR: #Same as saying if PICKED_PNR is not None:
         processSingle()
     else:
-        processMultiple()
+        #Make new files for each PNR_deptime combo
+        for PNR in pnr_list:
+            for deptime_select in deptime_list:
+                processMultiple(fieldnameList, PNR, deptime_select, args.MATRIX_FILE, pnrNameField, connect)
 
-    writePNRList(pnr_list, curtime)
-    writeDeptimes(deptimes_list, curtime)
+    mod.writeList('PNRList_{}'.format(connect), pnr_list)
+    print('PNR List written to file')
+    mod.writeList('Deptimes_{}'.format(connect), deptime_list)
+    print('Deptime List written to file')
 
 
