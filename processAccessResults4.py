@@ -1,4 +1,6 @@
 # This program performs mathematical operations to calculate four forms of accessibility values per origin ID.
+# The program can compare a baseline accessibility file with a access file where perhaps not all origins are included from
+# the baseline so the processing assumes no change to that origin and assigns the value from the baseline.
 
 #This program should be used after converting raw access output to averages using Average_transit_local.py
 
@@ -62,6 +64,12 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict):
             column = output_dict[label]
             # Assign the column name label
             column['label'] = label
+            #Here I need to add a statement to assign zero to all labels in the change dict where the label doesn't
+            #actually exist due to upstream calculation differences.
+            #if the change dict doesn't have information on the particular label, then add a entry and assign the
+            #threshold + label combo the jobs value from the base dict so that when change is calculated, no change occurs.
+            if label not in change_dict[thrshld]:
+                change_dict[thrshld] = {'label': label, 'jobs': baseDict[thrshld][label]}
             # Obtain the weighted accessibility values for the baseline and changed files
             base_access_wt = calcWeightedAccess(label, label_list, thrshld_list, base_dict)
             chg_access_wt = calcWeightedAccess(label, label_list, thrshld_list, change_dict)
@@ -86,7 +94,7 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict):
 
 
 def calcWeightedAccess(label, label_list, thrshld_list, access_dict):
-    # Calculte weighted values per threshold pair.
+    # Calculate weighted values per threshold pair.
     # Create a list of each difference threshold per label and per base and change.
     diff_list = []
     for thrshld in range(0, len(thrshld_list)):
