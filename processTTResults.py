@@ -105,6 +105,7 @@ def mkOutput(currentTime, fieldnames, name):
     writer = csv.DictWriter(outfile, fieldnames=fieldnames)  # , quotechar = "'"
     writer.writeheader()
     return writer
+
 #################################
 #           OPERATIONS          #
 #################################
