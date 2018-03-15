@@ -58,7 +58,7 @@ def triageTT(pnr, dest, or_depsec_list_sort):
     for index, or_dep_sec in enumerate(or_depsec_list_sort):
         next = index + 1
         # Make sure not to exceed 12th item in list
-        if index < len(or_depsec_list_sort):
+        if next < len(or_depsec_list_sort):
             cur.execute('SELECT traveltime '
                         'FROM {} '
                         'WHERE deptime_sec >= ? AND deptime_sec < ? AND origin = ? AND destination = ?'
