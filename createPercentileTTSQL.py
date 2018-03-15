@@ -9,6 +9,7 @@
 
 #The binning process rounds down so that a percentile is calculated for 6:00-8:45 but no percentile is calculated for 9:00.
 
+#Currently if this script is run more than once on the same DB, duplicate rows are inserted.
 #EXAMPLE USAGE: kristincarlson$ python createPercentileTTSQL.py -path <file path> -name <db.sqlite> -table1 <o2pnr>
 # -table2 <pnr2d> -table3 <pnr2d15>
 
