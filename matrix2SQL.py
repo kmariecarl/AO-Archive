@@ -2,8 +2,6 @@
 #The db path and name provided by the user initiates the db.
 #Two tables are created, the o2pnr and pnr2d tables.
 #A fifth column is added which converts the deptime to seconds for use in the TTMatrixLinkSQL.py script
-#As it stands, this script creates a new db if given a new file name. If given the existing path and db
-#name, the script will raise an exception and no changes will be commited.
 
 #Example Usage: kristincarlson~ python matrix2SQL.py -path /Users/kristincarlson/Dropbox/Bus-Highway/Task3/
 # Restart2/IntermodalAccess/1_TTMatrixLink/ -name newdbname.sqlite -table1 o2pnr -data1 <path/file.txt>
@@ -32,6 +30,8 @@ if __name__ == '__main__':
     parser.add_argument('-data1', '--TABLE1_PATH_DATA', required=True, default=None)  #List path to .csv file
     parser.add_argument('-table2', '--TABLE2_NAME', required=True, default=None)  #Assign Table 2 name in schema, i.e. pnr2d15
     parser.add_argument('-data2', '--TABLE2_PATH_DATA', required=True, default=None)  #List path to .csv file
+    parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=False, default=None)  #Assign jobs table name in schema, i.e. jobs
+    parser.add_argument('-jobsdata', '--JOBS_PATH_DATA', required=False, default=None)  #List path to .csv file
     args = parser.parse_args()
 
     #Make db
@@ -99,6 +99,31 @@ if __name__ == '__main__':
         cur.execute('CREATE INDEX pnr2d_deptime_origin ON {} (deptime_sec ASC, origin ASC);'.format(args.TABLE2_NAME))
     except sqlite3.OperationalError:
         print('Error: Indices already created')
+
+    # Create a new table in the SQLite database where the jobs data will go.
+    try:
+        cur.execute(
+            'CREATE TABLE IF NOT EXISTS {} (geoid10 VARCHAR, C000 BIGINT);'.format(
+                args.JOBS_TABLE_NAME))
+
+    except sqlite3.OperationalError:
+        print('Error: Jobs Table: Please debug')
+
+    # Open the data for table into a DictReader Object
+    with open('{}'.format(args.JOBS_PATH_DATA)) as mydata:
+        jobs = csv.DictReader(mydata)
+        # Produce list for each row of input data
+        to_db_jobs = [(row['GEOID10'], row['C000']) for row in jobs]
+
+    # Batch process the data into table 1
+    try:
+        cur.executemany(
+            "INSERT INTO {} (geoid10, C000) VALUES (?, ?);".format(
+                args.JOBS_TABLE_NAME),
+            to_db_jobs)
+    except sqlite3.OperationalError:
+        print('Error: Values already inserted to {}.'.format(args.JOBS_TABLE_NAME))
+
 
     #Committing change and closing the connection to the database file.
     con.commit()
