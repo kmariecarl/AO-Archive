@@ -56,6 +56,8 @@ def makeList():
 def triageTT(pnr, dest, or_depsec_list_sort):
     # Cycle through 15 minute departure time list from origin and apply to destinations
     #Or_depsec_list_sort contains the 12 bins (6:00, 6:15, 6:30...8:45) in seconds and sorted
+    #cur.execute('DELETE FROM {};'.format(args.TABLE3_NAME))
+    #con.commit()
     for index, or_dep_sec in enumerate(or_depsec_list_sort):
         next = index + 1
         # Make sure not to exceed 12th item in list
@@ -77,7 +79,7 @@ def triageTT(pnr, dest, or_depsec_list_sort):
 
             WRITER.writerow([pnr, dest, or_dep, or_dep_sec, new_tt])
             #Add new percentile TT to table 3.
-            cur.execute('INSERT INTO {} VALUES (?, ?, ?, ?, ?);'.format(TABLE3), (pnr, dest, or_dep, or_dep_sec, new_tt))
+            cur.execute('INSERT INTO {} (origin, destination, deptime, deptime_sec, traveltime) VALUES (?, ?, ?, ?, ?);'.format(TABLE3), (pnr, dest, or_dep, or_dep_sec, new_tt))
             con.commit()
 
 
@@ -110,12 +112,14 @@ if __name__ == '__main__':
     parser.add_argument('-table1', '--TABLE1_NAME', required=True, default=None)  #ENTER the name of the o2pnr table
     parser.add_argument('-table2', '--TABLE2_NAME', required=True, default=None)  #ENTER the name of the pnr2d table
     parser.add_argument('-table3', '--TABLE3_NAME', required=True, default=None)  #ENTER the name of the new table file i.e. pnr2d15
+    parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=False, default=None) #ENTER the jobs table name
     args = parser.parse_args()
 
     DB_NAME = args.DB_NAME
     TABLE1 = args.TABLE1_NAME
     TABLE2 = args.TABLE2_NAME
     TABLE3 = args.TABLE3_NAME
+    JOBS = args.JOBS_TABLE_NAME
 
     sqlite_file = '{}{}'.format(args.FOLDER_PATH, DB_NAME)
 
@@ -147,9 +151,79 @@ if __name__ == '__main__':
         for dest in destList:
             triageTT(pnr, dest, orDepSecListSort)
         print('The 15th percentile TT has been calculated and recorded for PNR {}'.format(pnr))
-    #One the new table has been created, add indexing
+
+    try:
+        query = """SELECT jobs FROM {}"""
+        cur.execute(query.format(args.TABLE3_NAME))
+
+    except sqlite3.OperationalError:
+        # Add jobs data to pnr2d15
+        cur.execute('ALTER TABLE {} ADD myjobs BIGINT;'.format(args.TABLE3_NAME))
+        con.commit()
+        query = """UPDATE pnr2d15
+                    SET myjobs = (SELECT C000
+                    FROM jobs
+                    WHERE jobs.geoid10 = pnr2d15.destination);"""
+        cur.execute(query)
+        con.commit()
+
+        # update
+        # pnr2d
+        # set
+        # myjobs = (select
+        # C000
+        # from jobs
+        #     where
+        #
+        # jobs.geoid10 = pnr2d.destination);
+    # cur.execute('DROP VIEW IF EXISTS tt_jobs')
+    # query = """CREATE VIEW IF NOT EXISTS tt_jobs AS SELECT pnr2d15.origin,
+    #                                             pnr2d15.destination,
+    #                                             pnr2d15.deptime,
+    #                                             pnr2d15.deptime_sec,
+    #                                             pnr2d15.traveltime,
+    #                                     jobs.jobs
+    #                                     FROM pnr2d15
+    #                                     LEFT JOIN jobs
+    #                                     ON pnr2d15.destination = jobs.geoid10;"""
+    #
+    # query = """UPDATE {} a
+    #             SET a.jobs = b.jobs
+    #             FROM jobs b"""
+    #
+    # cur.execute(query)
+    # con.commit()
+    #
+    # cur.execute('select*from tt_jobs;')
+    # print(cur.fetchall())
+
+      #  'SELECT pnr2d15.origin, pnr2d15.destination, pnr2d15.deptime, pnr2d15.deptime_sec, pnr2d15.traveltime, jobs.jobs FROM pnr2d15 LEFT JOIN jobs ON pnr2d15.destination = jobs.geoid10;')  # .format(args.TABLE3_NAME,
+    # .format(args.TABLE3_NAME,
+    # args.TABLE3_NAME,
+    # args.TABLE3_NAME,
+    # args.TABLE3_NAME,
+    # args.TABLE3_NAME,
+    # args.JOBS_TABLE_NAME,
+    # args.TABLE3_NAME,
+    # args.JOBS_TABLE_NAME,
+    # args.TABLE3_NAME,
+    # args.JOBS_TABLE_NAME))
+    # select pnr2d15.origin, pnr2d15.destination, pnr2d15.deptime, pnr2d15.deptime_sec, pnr2d15.traveltime, jobs.jobs from pnr2d15 left join jobs on pnr2d15.destination = jobs.geoid10;
+    print('Jobs data matched to {}'.format(args.TABLE3_NAME))
+    #Once the new table has been created, add indexing
     cur.execute('CREATE INDEX IF NOT EXISTS {}_deptime_origin ON {} (deptime_sec ASC, origin ASC);'.format(args.TABLE3_NAME, args.TABLE3_NAME))
+    print('Index created on pnr2d15 table')
+
+
     #Write index to table
     con.commit()
     con.close()
     mod.elapsedTime(start_time)
+
+    # WHERE
+    # EXISTS(SELECT *
+    #        FROM
+    # jobs
+    # WHERE
+    # jobs.geoid10 = pnr2d15.destination
+    # );
