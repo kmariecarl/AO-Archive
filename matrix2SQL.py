@@ -22,7 +22,7 @@ def createTables():
     # Create a new table in the SQLite database where the o2pnr data will go.
     try:
         cur.execute(
-            'CREATE TABLE IF NOT EXISTS {} (origin VARCHAR, destination VARCHAR, deptime VARCHAR, traveltime BIGINT, deptime_sec BIGINT);'
+            'CREATE TABLE IF NOT EXISTS {} (origin VARCHAR, destination VARCHAR, deptime VARCHAR, traveltime BIGINT);'
                 .format(TABLE1))
 
     except sqlite3.OperationalError:
@@ -44,10 +44,14 @@ def createTables():
     except sqlite3.OperationalError:
         print('Error: Jobs Table: Please debug')
 
+    print('Tables {}, {}, and {} created'.format(TABLE1, TABLE2, JOBS))
+    bar.update()
+
 def insertO2P():
     # Open the data for table 1 into a DictReader Object
+    fieldnames = ('origin', 'destination', 'deptime', 'traveltime')
     with open('{}'.format(args.TABLE1_PATH_DATA)) as f:
-        ttmatrix1 = csv.DictReader(f)
+        ttmatrix1 = csv.DictReader(f, fieldnames=fieldnames, delimiter=',')
         # Produce list for each row of input data stored
         to_db_tbl1 = [(row['origin'], row['destination'], row['deptime'], row['traveltime']) for row in ttmatrix1]
         bar.update()
@@ -99,7 +103,7 @@ def updateO2PField():
     # Add a column to table 1 to translate deptimes into an integer in seconds. No need to do this for table 2 because
     #I did it in the original loop.
     try:
-        #cur.execute('ALTER TABLE {} ADD deptime_sec BIGINT;'.format(TABLE1))
+        cur.execute('ALTER TABLE {} ADD deptime_sec BIGINT;'.format(TABLE1))
         cur.execute('UPDATE {} SET deptime_sec = SUBSTR(deptime, 1, 2) * 3600 + SUBSTR(deptime, 3, 4) * 60;'.format(TABLE1))
         bar.update()
         print('Deptimes converted to Seconds for {} table'.format(TABLE1))
@@ -126,7 +130,7 @@ if __name__ == '__main__':
 
     #Introduce progressbar
     widgets = [progressbar.Percentage(), progressbar.Bar()]
-    bar = progressbar.ProgressBar(widgets=widgets, max_value=100).start()
+    bar = progressbar.ProgressBar(widgets=widgets, max_value=progressbar.UnknownLength).start()
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
