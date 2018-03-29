@@ -45,22 +45,23 @@ def createTables():
         print('Error: Jobs Table: Please debug')
 
     print('Tables {}, {}, and {} created'.format(TABLE1, TABLE2, JOBS))
-    bar.update()
+    #bar.update()
 
 def insertO2P():
     # Open the data for table 1 into a DictReader Object
-    fieldnames = ('origin', 'destination', 'deptime', 'traveltime')
+    #fieldnames = ('origin', 'destination', 'deptime', 'traveltime')
     with open('{}'.format(args.TABLE1_PATH_DATA)) as f:
-        ttmatrix1 = csv.DictReader(f, fieldnames=fieldnames, delimiter=',')
+        ttmatrix1 = csv.DictReader(f) #, fieldnames=fieldnames, delimiter=',')
         # Produce list for each row of input data stored
         to_db_tbl1 = [(row['origin'], row['destination'], row['deptime'], row['traveltime']) for row in ttmatrix1]
-        bar.update()
+        print('Origin info added to list {}'.format(DB_NAME))
+        #bar.update()
     # Batch process the data into table 1
     try:
         cur.executemany(
             "INSERT INTO {} (origin, destination, deptime, traveltime) VALUES (?, ?, ?, ?);"
                 .format(TABLE1), to_db_tbl1)
-        bar.update()
+        #bar.update()
         print('Origin table added to db {}'.format(DB_NAME))
 
     except sqlite3.OperationalError:
@@ -74,7 +75,7 @@ def insertP2D():
         count = 0
         for row in reader:
             if count != 0:
-                bar.update()
+                #bar.update()
                 # Iteratively create the deptime_sec rows.
                 deptime_sec = mod.convert2Sec(row['deptime'])
                 cur.execute("INSERT INTO {} (origin, destination, deptime, traveltime, deptime_sec) VALUES (?, ?, ?, ?, ?);"
@@ -89,12 +90,12 @@ def insertJobs():
         jobs = csv.DictReader(jobsfile)
         # Produce list for each row of input data
         to_db_jobs = [(row['GEOID10'], row['C000']) for row in jobs]
-        bar.update()
+        #bar.update()
     # Batch process the data into table 1
     try:
         cur.executemany(
             "INSERT INTO {} (geoid10, C000) VALUES (?, ?);".format(JOBS),to_db_jobs)
-        bar.update()
+        #bar.update()
         print('Jobs table finished')
     except sqlite3.OperationalError:
         print('Error: Values already inserted to {}.'.format(JOBS))
@@ -105,7 +106,7 @@ def updateO2PField():
     try:
         cur.execute('ALTER TABLE {} ADD deptime_sec BIGINT;'.format(TABLE1))
         cur.execute('UPDATE {} SET deptime_sec = SUBSTR(deptime, 1, 2) * 3600 + SUBSTR(deptime, 3, 4) * 60;'.format(TABLE1))
-        bar.update()
+        #bar.update()
         print('Deptimes converted to Seconds for {} table'.format(TABLE1))
 
     except sqlite3.OperationalError:
@@ -116,7 +117,7 @@ def createIndices():
     try:
         cur.execute('CREATE INDEX o2pnr_deptime_origin ON {} (deptime_sec ASC, origin ASC);'.format(TABLE1))
         cur.execute('CREATE INDEX pnr2d_deptime_origin ON {} (deptime_sec ASC, origin ASC);'.format(TABLE2))
-        bar.update()
+        #bar.update()
         print("Indices Added")
     except sqlite3.OperationalError:
         print('Error: Indices already created')
@@ -129,8 +130,8 @@ def createIndices():
 if __name__ == '__main__':
 
     #Introduce progressbar
-    widgets = [progressbar.Percentage(), progressbar.Bar()]
-    bar = progressbar.ProgressBar(widgets=widgets, max_value=progressbar.UnknownLength).start()
+    #widgets = [progressbar.Percentage(), progressbar.Bar()]
+    #bar = progressbar.ProgressBar(widgets=widgets, max_value=progressbar.UnknownLength).start()
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
@@ -167,6 +168,6 @@ if __name__ == '__main__':
 
     print('DB {} has been created and filled'.format(DB_NAME))
     #Committing change and closing the connection to the database file.
-    bar.finish()
+    #bar.finish()
     con.commit()
     con.close()
