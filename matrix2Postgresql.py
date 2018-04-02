@@ -32,16 +32,16 @@ def createTables():
             .format(SCHEMA_NAME,TABLE1)
         cur.execute(query,)
     except:
-        print('Error: Please debug')
+        print('Error: Please debug 1')
 
     # Create a new table in the postgresql database where the pnr2d data will go.
     try:
-        query = "CREATE TABLE IF NOT EXISTS {}.{} (origin VARCHAR, destination VARCHAR, deptime VARCHAR, traveltime BIGINT, deptime_sec BIGINT bin INTEGER);"\
+        query = "CREATE TABLE IF NOT EXISTS {}.{} (origin VARCHAR, destination VARCHAR, deptime VARCHAR, traveltime BIGINT, deptime_sec BIGINT, bin INTEGER);"\
             .format(SCHEMA_NAME,TABLE2)
         cur.execute(query,)
 
     except:
-        print('Error: Please debug.')
+        print('Error: Please debug 2')
 
     # Create a new table in the postgresql database where the jobs data will go.
     try:
@@ -49,7 +49,7 @@ def createTables():
         cur.execute(query,)
 
     except:
-        print('Error: Jobs Table: Please debug')
+        print('Error: Jobs Table: Please debug 3')
 
 
     print('Tables {}, {}, and {} created'.format(TABLE1, TABLE2, JOBS))
@@ -95,36 +95,37 @@ def insertP2D():
                 # Iteratively create the deptime_sec rows.
                 deptime_sec = mod.convert2Sec(row['deptime'])
                 bin = assignBin(deptime_sec)
-
-                cur.execute("INSERT INTO {}.{} VALUES (%s, %s, %s, %s, %s, %s);".format(SCHEMA_NAME,TABLE2),
+                #print(bin)
+                query = "INSERT INTO {}.{} VALUES (%s, %s, %s, %s, %s, %s);"
+                cur.execute(query.format(SCHEMA_NAME,TABLE2),
                             (row['origin'], row['destination'], row['deptime'], row['traveltime'], deptime_sec, bin))
             count += 1
         print('Destination table added to schema {}'.format(SCHEMA_NAME))
 
 def assignBin(deptime_sec):
-    if deptime_sec >= 21600 and deptime_sec < 22500:
+    if deptime_sec < 22500:
         bin = 1
-    elif deptime_sec >= 22500 and deptime_sec < 23400:
+    elif deptime_sec < 23400:
         bin = 2
-    elif deptime_sec >= 23400 and deptime_sec < 24300:
+    elif deptime_sec < 24300:
         bin = 3
-    elif deptime_sec >= 24300 and deptime_sec < 25200:
+    elif deptime_sec < 25200:
         bin = 4
-    elif deptime_sec >= 25200 and deptime_sec < 26100:
+    elif deptime_sec < 26100:
         bin = 5
-    elif deptime_sec >= 26100 and deptime_sec < 27000:
+    elif deptime_sec < 27000:
         bin = 6
-    elif deptime_sec >= 27000 and deptime_sec < 27900:
+    elif deptime_sec < 27900:
         bin = 7
-    elif deptime_sec >= 27900 and deptime_sec < 28800:
+    elif deptime_sec < 28800:
         bin = 8
-    elif deptime_sec >= 28800 and deptime_sec < 29700:
+    elif deptime_sec < 29700:
         bin = 9
-    elif deptime_sec >= 29700 and deptime_sec < 30600:
+    elif deptime_sec < 30600:
         bin = 10
-    elif deptime_sec >= 30600 and deptime_sec < 31500:
+    elif deptime_sec < 31500:
         bin = 11
-    elif deptime_sec >= 31500 and deptime_sec <= 32400:
+    elif deptime_sec >= 32400:
         bin = 12
     return bin
 
