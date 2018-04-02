@@ -40,7 +40,7 @@ def makeNestedDict(pnr, dest_dep_list, file_name_od):
     return nest
 
 #A function to calculate the new travel time in 15 minute bins based on 15th percentile
-def makeCentileFile(p2d_dict, or_dep_list, writer):
+def makeCentileFile(pnr, p2d_dict, or_dep_list, writer):
     #Sort in ascending order
     or_dep_list_sort = sorted(or_dep_list)
     print("Sorted deptime list", or_dep_list_sort)
@@ -62,8 +62,8 @@ def makeCentileFile(p2d_dict, or_dep_list, writer):
                 #Calc 15th percentile TT and add to centile_dict
                 new_tt = calcPercentile(bin15)
                 #DON'T INCLUDE ANY DESTINATIONS THAT CANNOT BE REACHED.
-                if new_tt != 2147483647:
-                    writer.writerow([dest, time15, new_tt])
+                #if new_tt != 2147483647:
+                writer.writerow([pnr, dest, time15, new_tt])
 
     print("Centile File Created")
     mod.elapsedTime(START_TIME)
@@ -73,7 +73,7 @@ def calcPercentile(bin_15):
     if allSame(bin_15) is True:
         tile = 2147483647
     else:
-        tile = numpy.percentile(bin_15, 15) #, interpolation='lower')
+        tile = numpy.percentile(bin_15, 15, interpolation='lower')
     return int(tile)
 
 #Check if list contains all Maxtime values (all the same values)
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Output file fieldnames
-    fieldnames = ['destination', 'deptime', 'traveltime']
+    fieldnames = ['origin', 'destination', 'deptime', 'traveltime']
 
     #May not be necessary to read in arguments to string variables
     PNRListVar = str(args.PNRLIST_FILE)
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         writer = mod.mkOutput(file_name, fieldnames )
 
         # Map destinations to 15th percentile TT in 15 minute bins
-        makeCentileFile(p2dDict, orDepList, writer)
+        makeCentileFile(pnr, p2dDict, orDepList, writer)
 
         print("Percentile file created for PNR {}".format(pnr))
     mod.elapsedTime(START_TIME)
