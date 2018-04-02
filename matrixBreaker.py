@@ -138,11 +138,13 @@ if __name__ == '__main__':
     # Parameterize file paths
     parser = argparse.ArgumentParser()
     #Tell the program which field contains the pnr values, answer is either origin or destination
-    parser.add_argument('-matrix', '--MATRIX_FILE', required=True, default=None)
-    parser.add_argument('-pnr', '--PNR_FIELD', required=True, default=None)
-    parser.add_argument('-connect', '--CONNECT_FIELD', required=True, default=None)
-    parser.add_argument('-pick', '--PICKED_PNR', required=False, default=None)
-    parser.add_argument('-split', '--SPLIT_DIR', required=False, default=None)
+    parser.add_argument('-matrix', '--MATRIX_FILE', required=True, default=None) #Name of singluar matrix file if small enough
+    parser.add_argument('-pnr', '--PNR_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
+    parser.add_argument('-connect', '--CONNECT_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
+    parser.add_argument('-pnrlist', '--PNR_LIST', required=True, default=None) #File that contain pre-made PNR list
+    parser.add_argument('-deplist', '--DEPTIME_LIST', required=True, default=None)  #File that contains pre-made departure time list
+    parser.add_argument('-pick', '--PICKED_PNR', required=False, default=None)  #Provide when only looking at 1 pnr facility
+    parser.add_argument('-split', '--SPLIT_DIR', required=False, default=None) #Provide when using a split directory for large matrices
     args = parser.parse_args()
 
     #Create fieldnames for output files
@@ -155,7 +157,12 @@ if __name__ == '__main__':
     connect = str(args.CONNECT_FIELD)
     print('connect-field:', connect)
 
-    pnr_list, deptime_list = makeLists(args.MATRIX_FILE, pnrNameField)
+    #If the pnr and deptime pre-made files are not provided, make them from the imported matrix
+    if not args.PNR_LIST:
+        pnr_list, deptime_list = makeLists(args.MATRIX_FILE, pnrNameField)
+    else:
+        pnr_list = mod.readList(args.PNR_LIST)
+        deptime_list = mod.readList(args.DEPTIME_LIST)
 
     # Add a statement to do the process for only one "picked" PNR
     if args.PICKED_PNR: #Same as saying if PICKED_PNR is not None:
