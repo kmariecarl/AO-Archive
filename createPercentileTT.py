@@ -12,7 +12,7 @@ import argparse
 import csv
 from collections import defaultdict
 import numpy
-import matrixLinkModule as mod
+from myToolsPackage import matrixLinkModule as mod
 
 
 #################################
@@ -48,7 +48,7 @@ def makeCentileFile(pnr, p2d_dict, or_dep_list, writer):
     #Break off destinations
     for dest, timing in p2d_dict.items():
         # Cycle through 15 minute departure time list from origin and apply to destinations
-        for index, time15 in enumerate(or_dep_list_sort):
+        for index, dep15 in enumerate(or_dep_list_sort):
             next = index + 1
             #Make sure not to exceed 15th item in list otherwise error
             if next < len(or_dep_list_sort):
@@ -57,13 +57,11 @@ def makeCentileFile(pnr, p2d_dict, or_dep_list, writer):
                 #Break out deptimes for each destination
                 for deptime, tt in p2d_dict[dest].items():
                     #Check if deptime is within 15 minute bin. Ex. if 6:02 >= 6:00 and 6:02 < 6:15...
-                    if deptime >= time15 and deptime < or_dep_list_sort[next]:
+                    if deptime >= dep15 and deptime < or_dep_list_sort[next]:
                         bin15.append(int(tt))
                 #Calc 15th percentile TT and add to centile_dict
                 new_tt = calcPercentile(bin15)
-                #DON'T INCLUDE ANY DESTINATIONS THAT CANNOT BE REACHED.
-                #if new_tt != 2147483647:
-                writer.writerow([pnr, dest, time15, new_tt])
+                writer.writerow([pnr, dest, dep15, new_tt])
 
     print("Centile File Created")
     mod.elapsedTime(START_TIME)
@@ -87,11 +85,12 @@ def allSame(items):
 if __name__ == '__main__':
 
     START_TIME, curtime = mod.startTimer()
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-pnr', '--PNRLIST_FILE', required=True, default=None)
     parser.add_argument('-or_dep', '--OR_DEP_FILE', required=True, default=None)
     parser.add_argument('-dest_dep', '--DEST_DEP_FILE', required=True, default=None)
-    parser.add_argument('-od', '--OD', required=True, default=None)
+    parser.add_argument('-od', '--OD', required=True, default=None) #Origin or destination can be typed, indicates extension.
     args = parser.parse_args()
 
     #Output file fieldnames
@@ -102,10 +101,11 @@ if __name__ == '__main__':
     orDepVar = str(args.OR_DEP_FILE)
     destDepVar = str(args.DEST_DEP_FILE)
     file_name_od = str(args.OD)
-    #Create lists from the files read into program
+
+    #Create lists from the files read into the program
     PNRList = mod.readList(PNRListVar)
-    orDepList = mod.readList(orDepVar, str)
-    destDepList = mod.readList(destDepVar, str)
+    orDepList = mod.readList(orDepVar)
+    destDepList = mod.readList(destDepVar)
 
     #Create a separate percentileTT file for each PNR
     for pnr in PNRList:
