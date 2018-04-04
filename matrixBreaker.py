@@ -61,7 +61,8 @@ def makeLists(matrix, connect_field, pnr_name_field):
 
             #Assuming this program is first run on the origin matrix, only the destination list needs to be created.
             if connect_field == 'destination':
-                connect_list.append(row[connect_field])
+                if row[connect_field] not in connect_list:
+                    connect_list.append(row[connect_field])
 
         #Write out lists to files if list has been filled
         if len(connect_list) > 0:
@@ -181,6 +182,8 @@ if __name__ == '__main__':
     else:
         pnr_list = mod.readList(args.PNR_LIST)
         deptime_list = mod.readList(args.DEPTIME_LIST)
+        #Run makeList() function just to make the destination file
+        makeLists(args.MATRIX_FILE, connect, pnrNameField)
 
     # Add a statement to do the process for only one "picked" PNR
     if args.PICKED_PNR: #Same as saying if PICKED_PNR is not None:
