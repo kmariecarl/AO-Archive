@@ -26,16 +26,17 @@
 #################################
 import argparse
 import csv
-import matrixLinkModule as mod
+from myToolsPackage import matrixLinkModule as mod
 
 
 #################################
 #           FUNCTIONS           #
 #################################
 
-#A function to find all PNR and deptimes unique to the matrix file.
-def makeLists(matrix, pnr_name_field):
+#A function to find all PNR and deptimes unique to the matrix file. Also makes list files for origin, deptimes, pnrs, and destinations.
+def makeLists(matrix, connect_field, pnr_name_field):
     #Initiate Lists
+    connect_list = []
     pnr_list = []
     deptime_list = []
 
@@ -43,15 +44,36 @@ def makeLists(matrix, pnr_name_field):
     with open(matrix) as f:
         reader = csv.DictReader(f)
 
-        #Create PNR and Deptime lists
+        #Create Connect, PNR and Deptime lists
         for row in reader:
-            #Check if PNR has been added to pnr_list.
-            if row[pnr_name_field] not in pnr_list:
-                pnr_list.append(row[pnr_name_field])
-            #Check if departure time in seconds has been added to deptime_list
-            dep_sec = mod.convert2Sec(row['deptime'])
-            if dep_sec not in deptime_list:
-                deptime_list.append(dep_sec)
+            # Check if origin or destination list needs to be made:
+            if connect_field == 'origin':
+                if row[connect_field] not in connect_list:
+                    connect_list.append(row[connect_field])
+
+                #Check if PNR has been added to pnr_list.
+                if row[pnr_name_field] not in pnr_list:
+                    pnr_list.append(row[pnr_name_field])
+                #Check if departure time in regular time has been added to deptime_list
+
+                if row['deptime'] not in deptime_list:
+                    deptime_list.append(row['deptime'])
+
+            #Assuming this program is first run on the origin matrix, only the destination list needs to be created.
+            if connect_field == 'destination':
+                connect_list.append(row[connect_field])
+
+        #Write out lists to files if list has been filled
+        if len(connect_list) > 0:
+            mod.writeList('{}_List'.format(connect_field), connect_list, curtime)
+            print('{} List written to file'.format(connect_field))
+        if len(pnr_list) > 0:
+            mod.writeList("PNR_List", pnr_list, curtime)
+            print('PNR List written to file')
+        if len(deptime_list) > 0:
+            mod.writeList("Deptime_List", deptime_list, curtime)
+            print('Deptime List written to file')
+
 
     return pnr_list, deptime_list
 
@@ -103,7 +125,7 @@ def makeLists(matrix, pnr_name_field):
 #     print("File written for PNR {}".format(pick))
 #A function to extract and make files for every PNR listed in the original TT matrix
 def processMultiple(fieldname_list, pnr, deptime_select, matrix, pnr_name_field, connect):
-    # Open Matrix file for every PNR and deptime combo which makes the program run long (40 min for unit test)
+    # Open Matrix file for every PNR and deptime combo
     with open(matrix) as f:
         reader = csv.DictReader(f)
 
@@ -113,19 +135,14 @@ def processMultiple(fieldname_list, pnr, deptime_select, matrix, pnr_name_field,
 
         # Cycle through the entire input matrix and add rows to mkOutput file that match the selected PNR and deptime
         for row_again in reader:
-            # #Permanantly convert deptime to seconds
-            deptime_sec = mod.convert2Sec(row_again['deptime'])
-            #If PNR_row == PNR_fromlist and deptime_sec == deptime_select_fromlist:
-            if int(row_again[pnr_name_field]) == int(pnr) and int(deptime_sec) == int(deptime_select):
+            #If PNR_row == PNR_fromlist and deptime == deptime_select_fromlist:
+            if int(row_again[pnr_name_field]) == int(pnr) and int(row_again['deptime']) == int(deptime_select):
 
-                entry = [row_again['origin'], row_again['destination'], deptime_sec, row_again['traveltime']]
+                entry = [row_again['origin'], row_again['destination'], row_again['deptime'], row_again['traveltime']]
                 writer.writerow(entry)
 
         print("File written for PNR {} at deptime {}".format(pnr, deptime_select))
         mod.elapsedTime(START_TIME)
-
-
-
 
 
 #################################
@@ -141,8 +158,9 @@ if __name__ == '__main__':
     parser.add_argument('-matrix', '--MATRIX_FILE', required=True, default=None) #Name of singluar matrix file if small enough
     parser.add_argument('-pnr', '--PNR_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
     parser.add_argument('-connect', '--CONNECT_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
-    parser.add_argument('-pnrlist', '--PNR_LIST', required=True, default=None) #File that contain pre-made PNR list
-    parser.add_argument('-deplist', '--DEPTIME_LIST', required=True, default=None)  #File that contains pre-made departure time list
+   #Below are all of the optional arguments
+    parser.add_argument('-pnrlist', '--PNR_LIST', required=False, default=None) #File that contain pre-made PNR list
+    parser.add_argument('-deplist', '--DEPTIME_LIST', required=False, default=None)  #File that contains pre-made departure time list
     parser.add_argument('-pick', '--PICKED_PNR', required=False, default=None)  #Provide when only looking at 1 pnr facility
     parser.add_argument('-split', '--SPLIT_DIR', required=False, default=None) #Provide when using a split directory for large matrices
     args = parser.parse_args()
@@ -159,7 +177,7 @@ if __name__ == '__main__':
 
     #If the pnr and deptime pre-made files are not provided, make them from the imported matrix
     if not args.PNR_LIST:
-        pnr_list, deptime_list = makeLists(args.MATRIX_FILE, pnrNameField)
+        pnr_list, deptime_list = makeLists(args.MATRIX_FILE, connect, pnrNameField)
     else:
         pnr_list = mod.readList(args.PNR_LIST)
         deptime_list = mod.readList(args.DEPTIME_LIST)
@@ -172,10 +190,5 @@ if __name__ == '__main__':
         for PNR in pnr_list:
             for deptime_select in deptime_list:
                 processMultiple(fieldnameList, PNR, deptime_select, args.MATRIX_FILE, pnrNameField, connect)
-
-    mod.writeList('PNRList_{}'.format(connect), pnr_list)
-    print('PNR List written to file')
-    mod.writeList('Deptimes_{}'.format(connect), deptime_list)
-    print('Deptime List written to file')
 
 
