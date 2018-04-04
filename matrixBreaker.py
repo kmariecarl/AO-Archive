@@ -47,36 +47,39 @@ def makeLists(matrix, connect_field, pnr_name_field):
         #Create Connect, PNR and Deptime lists
         for row in reader:
             # Check if origin or destination list needs to be made:
-            if connect_field == 'origin':
-                if row[connect_field] not in connect_list:
-                    connect_list.append(row[connect_field])
+            #if connect_field == 'origin':
+            if row[connect_field] not in connect_list:
+                connect_list.append(row[connect_field])
 
-                #Check if PNR has been added to pnr_list.
-                if row[pnr_name_field] not in pnr_list:
-                    pnr_list.append(row[pnr_name_field])
-                #Check if departure time in regular time has been added to deptime_list
+            #Check if PNR has been added to pnr_list.
+            if row[pnr_name_field] not in pnr_list:
+                pnr_list.append(row[pnr_name_field])
+            #Check if departure time in regular time has been added to deptime_list
 
-                if row['deptime'] not in deptime_list:
-                    deptime_list.append(row['deptime'])
+            if row['deptime'] not in deptime_list:
+                deptime_list.append(row['deptime'])
 
             #Assuming this program is first run on the origin matrix, only the destination list needs to be created.
-            if connect_field == 'destination':
-                if row[connect_field] not in connect_list:
-                    connect_list.append(row[connect_field])
+            # if connect_field == 'destination':
+            #     if row[connect_field] not in connect_list:
+            #         connect_list.append(row[connect_field])
 
         #Write out lists to files if list has been filled
-        if len(connect_list) > 0:
-            mod.writeList('{}_List'.format(connect_field), connect_list, curtime)
-            print('{} List written to file'.format(connect_field))
-        if len(pnr_list) > 0:
-            mod.writeList("PNR_List", pnr_list, curtime)
-            print('PNR List written to file')
-        if len(deptime_list) > 0:
-            mod.writeList("Deptime_List", deptime_list, curtime)
-            print('Deptime List written to file')
+
+        connect_list_sort = sorted(connect_list)
+        mod.writeList('{}_List'.format(connect_field), connect_list_sort, curtime)
+        print('{} List written to file'.format(connect_field))
+
+        pnr_list_sort = sorted(pnr_list)
+        mod.writeList("PNR_List_{}".format(connect_field), pnr_list_sort, curtime)
+        print('PNR List written to file')
+
+        deptime_list_sort = sorted(deptime_list)
+        mod.writeList("Deptime_List_{}".format(connect_field), deptime_list_sort, curtime)
+        print('Deptime List written to file')
 
 
-    return pnr_list, deptime_list
+    return pnr_list_sort, deptime_list_sort
 
 #Use this function to process a single PNR given a "split" directory
 #COME BACK AND FIX FOR WRITING OUT DEPTIME FILES
@@ -177,13 +180,13 @@ if __name__ == '__main__':
     print('connect-field:', connect)
 
     #If the pnr and deptime pre-made files are not provided, make them from the imported matrix
-    if not args.PNR_LIST:
-        pnr_list, deptime_list = makeLists(args.MATRIX_FILE, connect, pnrNameField)
-    else:
-        pnr_list = mod.readList(args.PNR_LIST)
-        deptime_list = mod.readList(args.DEPTIME_LIST)
+    #if not args.PNR_LIST:
+        #pnr_list, deptime_list = makeLists(args.MATRIX_FILE, connect, pnrNameField)
+    #else:
+        #pnr_list = mod.readList(args.PNR_LIST)
+        #deptime_list = mod.readList(args.DEPTIME_LIST)
         #Run makeList() function just to make the destination file
-        makeLists(args.MATRIX_FILE, connect, pnrNameField)
+    pnr_list, deptime_list = makeLists(args.MATRIX_FILE, connect, pnrNameField)
 
     # Add a statement to do the process for only one "picked" PNR
     if args.PICKED_PNR: #Same as saying if PICKED_PNR is not None:
