@@ -1,153 +1,113 @@
 
 #Application is used to break large Origin to PNR and PNR to Destination matrices into files by PNR and departure time.
 #This program shall be run after the creation of a TT matrix and before the linking of matrices by TTMatrixLink.py
+#Program architecture relys on o2pnr matrix first being passed, and assumes the user has already created a list of
+#PNRs, origin_deptimes, destination_deptimes, these are used for comparison within the program.
+#Next the pnr2d matrix is passed as a split directory along with the pre-made pnr and deptime list files. At this time
+#there is no way to efficiently make a destination list file using Matrix Breaker, it's possible but would be slow.
 
 #LOGIC:
-#1. import one matrix
-#2. Row by row, check if PNR has been added to PNR list, and if deptime has been added to deptime list.
-#3. Create pnr-list and deptime-list then seek to top of dictreader object
-#4. Loop through pnr_list and deptime-list and the entire matrix to find rows that match selected pnr and deptime
-#5. Seek to the top of the matrix dict object for each new pnr item and deptime item
-#6. Close matrix file
-
-#NOTES
-#Add an optional arguement to only break out one PNR
+#1. import a split file
+#2. Determine if the PNR has been visited before, if not, add to dictionary
+#3. Determine if the destination has been visited for that PNR before, if not, add to value list in dictionary.
+#4. If both PNR and Deptime have been visited, does a new file need to be opened?
+#5. Else, write current row to currently open writer object.
+#6. Compare the finalized list of PNRs with the externally provided list of PNRs to make sure that all were visited.
 
 #TT files come in with following header:
 #origin,destination,deptime,traveltime
 
 
+# EXAMPLE USAGE: kristincarlson$ python matrixBreaker.py -pnrlist PNRList_xxx.txt, -deplist Deptimes_dest_xxx.txt
+# -split ./UnitTest_Split/
 
-# EXAMPLE USAGE: kristincarlson$ python matrixBreaker.py -matrix o2pnr_tt-results.csv -pnr 'destination' -connect 'origin'
-# -pick '217' -split ./split/
-# The last two arguments are optional.
 #################################
 #           IMPORTS             #
 #################################
 import argparse
 import csv
 from myToolsPackage import matrixLinkModule as mod
-
+import glob
 
 #################################
 #           FUNCTIONS           #
 #################################
 
-#A function to find all PNR and deptimes unique to the matrix file. Also makes list files for origin, deptimes, pnrs, and destinations.
-def makeLists(matrix, connect_field, pnr_name_field):
-    #Initiate Lists
-    connect_list = []
-    pnr_list = []
-    deptime_list = []
+#Assumptions for processing split directory:
+#1. Assume a pre-made pnr list is given
+#2. Assume a pre-made origin or destination specific deptimes file has been created.
 
-    #Open Matrix file
-    with open(matrix) as f:
-        reader = csv.DictReader(f)
+def processSplit(location):
+    #Initiate global dictionary
+    PNR_2_DEPTIME_DICT = {}
+    for name in glob.glob('{}*'.format(args.SPLIT_DIR)):
+        print('name', name)  # Dynamically assign indicies depending input file
+        # Using 'with open' reads into memory one line at a time and discards the line when it moves to the next one.
+        with open('{}'.format(name)) as f:
+            reader = csv.reader(f)
+            #Skip first line of the first file, this is where the headers are listed.
+            if name == '{}xaa.csv'.format(args.SPLIT_DIR):
+                next(reader)
+            count = 0
+            for row in reader:
+                #Has PNR been visited before?
+                if int(row[location]) not in PNR_2_DEPTIME_DICT:
+                    #Do stuff to initiate new pnr and deptime, scenario 1
+                    #Initiate a key and list value for this new pnr
+                    PNR_2_DEPTIME_DICT[int(row[location])] = []
+                    #Set the pnr value until the next new one is found
+                    set_pnr = row[location]
+                    #Append the first departure time found for this pnr.
+                    PNR_2_DEPTIME_DICT[int(row[location])].append(row[2])
+                    #Set this deptime until a new one is found.
+                    set_deptime = row[2]
+                    #If both the PnR and deptime are new, then initiate a new file
+                    writer = mod.mkOutput('PNR_{}_{}'.format(set_pnr, set_deptime), FIELDNAMES)
+                    writer.writerow(row)
 
-        #Create Connect, PNR and Deptime lists
-        for row in reader:
-            # Check if origin or destination list needs to be made:
-            #if connect_field == 'origin':
-            if row[connect_field] not in connect_list:
-                connect_list.append(row[connect_field])
+                elif row[2] not in PNR_2_DEPTIME_DICT[int(row[location])]:
+                    #Do stuff for new deptime, scenario 2
+                    #Append the unvisited departure time to existing pnr list
+                    PNR_2_DEPTIME_DICT[int(row[location])].append(row[2])
+                    #Reset the PNR
+                    set_pnr = row[location]
+                    #Set this deptime until a new one is found.
+                    set_deptime = row[2]
+                    #The deptime is new so initiate a new file
+                    writer = mod.mkOutput('PNR_{}_{}'.format(set_pnr, set_deptime), FIELDNAMES)
+                    writer.writerow(row)
 
-            #Check if PNR has been added to pnr_list.
-            if row[pnr_name_field] not in pnr_list:
-                pnr_list.append(row[pnr_name_field])
-            #Check if departure time in regular time has been added to deptime_list
+                else:
+                    #Check if a file has already been started for this pnr + deptime combo, but only check on first line
+                    if int(row[location]) in PNR_2_DEPTIME_DICT and row[2] in PNR_2_DEPTIME_DICT[int(row[location])] and count == 0:
+                        #open previous file
+                        reopen = open('PNR_{}_{}.txt'.format(row[location], row[2]), 'a')
+                        writer = csv.writer(reopen)
+                        set_pnr = row[location]
+                        set_deptime = row[2]
+                        writer.writerow(row)
 
-            if row['deptime'] not in deptime_list:
-                deptime_list.append(row['deptime'])
+                    else:
+                        #Continue adding rows to either the new file created above, or the reopend file.
+                        if row[location] == set_pnr:
+                            if row[2] == set_deptime:
+                                writer.writerow(row)
+                count += 1
 
-            #Assuming this program is first run on the origin matrix, only the destination list needs to be created.
-            # if connect_field == 'destination':
-            #     if row[connect_field] not in connect_list:
-            #         connect_list.append(row[connect_field])
-
-        #Write out lists to files if list has been filled
-
-        connect_list_sort = sorted(connect_list)
-        mod.writeList('{}_List'.format(connect_field), connect_list_sort, curtime)
-        print('{} List written to file'.format(connect_field))
-
-        pnr_list_sort = sorted(pnr_list)
-        mod.writeList("PNR_List_{}".format(connect_field), pnr_list_sort, curtime)
-        print('PNR List written to file')
-
-        deptime_list_sort = sorted(deptime_list)
-        mod.writeList("Deptime_List_{}".format(connect_field), deptime_list_sort, curtime)
-        print('Deptime List written to file')
-
-
-    return pnr_list_sort, deptime_list_sort
-
-#Use this function to process a single PNR given a "split" directory
-#COME BACK AND FIX FOR WRITING OUT DEPTIME FILES
-#Try not to use "split" directory if possible.
-# def processSingle():
-#     print("Picked PNR:", args.PICKED_PNR)
-#     pick = str(args.PICKED_PNR)
-#     pnr_list.append(pick)
-#
-#     for name in glob.glob('{}*'.format(args.SPLIT_DIR)):  # .format(args.SPLIT_DIR)
-#         print('name', name)  # Dynamically assign indicies depending input file
-#         if pnr_name_field == 'origin':
-#             location = 0
-#             # location = 'origin'
-#             print('location:', location)
-#         else:
-#             location = 1
-#             # location = 'destination'
-#             print('location:', location)
-#
-#             # Using 'with open' reads into memory one line at a time and discards the line when it moves to the next one.
-#         with open('{}'.format(name)) as f:
-#             reader = csv.reader(f)
-#             # The Terminal 'split' function will always assign the first of the broken file to the xaa name
-#             # which will have the headers.
-#             if name == 'xaa.csv':
-#                 print('HEADER ROW')
-#                 next(reader)
-#
-#             # Create Deptime lists
-#             for row in reader:
-#                 if row[2] not in deptimes_list:
-#                     deptimes_list.append(row[2])
-#             f.seek(0)
-#
-#             # Cycle through the entire input matrix and add rows to mkOutput file that match the selected PNR
-#             for deptime in deptimes_list:
-#                 writer = mkOutput(fieldnames, pick, connect, deptime)
-#                 for row in reader:
-#                     # print(row_again[location], pick)
-#                     if row[location] == pick and row[2] == deptime:
-#                         writer.writerow(row)
-#
-#             print("Split file {} has been processed".format(name))
-#             elapsedTime()
-#             print('-------------------------')
-#     print("File written for PNR {}".format(pick))
-#A function to extract and make files for every PNR listed in the original TT matrix
-def processMultiple(fieldname_list, pnr, deptime_select, matrix, pnr_name_field, connect):
-    # Open Matrix file for every PNR and deptime combo
-    with open(matrix) as f:
-        reader = csv.DictReader(f)
-
-        #Initiate output file
-        file_name = 'PNR_{}_{}_{}'.format(pnr, deptime_select, connect)
-        writer = mod.mkOutput(file_name, fieldname_list)
-
-        # Cycle through the entire input matrix and add rows to mkOutput file that match the selected PNR and deptime
-        for row_again in reader:
-            #If PNR_row == PNR_fromlist and deptime == deptime_select_fromlist:
-            if int(row_again[pnr_name_field]) == int(pnr) and int(row_again['deptime']) == int(deptime_select):
-
-                entry = [row_again['origin'], row_again['destination'], row_again['deptime'], row_again['traveltime']]
-                writer.writerow(entry)
-
-        print("File written for PNR {} at deptime {}".format(pnr, deptime_select))
+        print("Split file {} has been processed".format(name))
         mod.elapsedTime(START_TIME)
+        print('-------------------------')
+    return list(PNR_2_DEPTIME_DICT.keys())
 
+def compareLists(list1, list2):
+    list1 = sorted(list1)
+    list2 = sorted(list2)
+    if list1 == list2:
+        print("Success, lists match!")
+        return True
+    else:
+        print("Not all values processed. Go back and check.")
+        return False
 
 #################################
 #           OPERATIONS          #
@@ -159,42 +119,29 @@ if __name__ == '__main__':
     # Parameterize file paths
     parser = argparse.ArgumentParser()
     #Tell the program which field contains the pnr values, answer is either origin or destination
-    parser.add_argument('-matrix', '--MATRIX_FILE', required=True, default=None) #Name of singluar matrix file if small enough
     parser.add_argument('-pnr', '--PNR_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
-    parser.add_argument('-connect', '--CONNECT_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
-   #Below are all of the optional arguments
+    #parser.add_argument('-connect', '--CONNECT_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
     parser.add_argument('-pnrlist', '--PNR_LIST', required=False, default=None) #File that contain pre-made PNR list
-    parser.add_argument('-deplist', '--DEPTIME_LIST', required=False, default=None)  #File that contains pre-made departure time list
-    parser.add_argument('-pick', '--PICKED_PNR', required=False, default=None)  #Provide when only looking at 1 pnr facility
-    parser.add_argument('-split', '--SPLIT_DIR', required=False, default=None) #Provide when using a split directory for large matrices
+    #parser.add_argument('-deplist', '--DEPTIME_LIST', required=False, default=None)  #File that contains pre-made departure time list
+    parser.add_argument('-split', '--SPLIT_DIR', required=False, default=None) #Provide when using a split directory for large matrices (any matrix over 1 GB)
     args = parser.parse_args()
 
     #Create fieldnames for output files
-    fieldnameList = ['origin', 'destination', 'deptime', 'traveltime']
+    FIELDNAMES = ['origin', 'destination', 'deptime', 'traveltime']
 
-    #Reassign PNR_FIELD to string label
-    pnrNameField = str(args.PNR_FIELD) #Will be either 'origin' or 'destination'
-    print('pnr-field-name:', pnrNameField)
-    #Reassign connecting field name to either origin or destination
-    connect = str(args.CONNECT_FIELD)
-    print('connect-field:', connect)
-
-    #If the pnr and deptime pre-made files are not provided, make them from the imported matrix
-    #if not args.PNR_LIST:
-        #pnr_list, deptime_list = makeLists(args.MATRIX_FILE, connect, pnrNameField)
-    #else:
-        #pnr_list = mod.readList(args.PNR_LIST)
-        #deptime_list = mod.readList(args.DEPTIME_LIST)
-        #Run makeList() function just to make the destination file
-    pnr_list, deptime_list = makeLists(args.MATRIX_FILE, connect, pnrNameField)
-
-    # Add a statement to do the process for only one "picked" PNR
-    if args.PICKED_PNR: #Same as saying if PICKED_PNR is not None:
-        processSingle()
+    #Read in pre-made lists used for comparison within this program
+    EXTERNAL_PNR_LIST = mod.readList(args.PNR_LIST)
+    #Not currently using the external deptime list for comparison.
+    #EXTERNAL_DEPTIME_LIST = mod.readList(args.DEPTIME_LIST)
+    #Assign variable field entry according to the PNR field
+    if args.PNR_FIELD == 'origin':
+        location = 0
     else:
-        #Make new files for each PNR_deptime combo
-        for PNR in pnr_list:
-            for deptime_select in deptime_list:
-                processMultiple(fieldnameList, PNR, deptime_select, args.MATRIX_FILE, pnrNameField, connect)
+        location = 1
+    #Process the split directory into PNR by minute files
+    internalPNRList = processSplit(location)
+    #At the end, verify that all PNRs in the external list match the internally generated list.
+    compareLists(EXTERNAL_PNR_LIST, internalPNRList)
+    mod.elapsedTime(START_TIME)
 
 
