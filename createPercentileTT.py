@@ -119,4 +119,5 @@ if __name__ == '__main__':
         makeCentileFile(pnr_select, p2dDict, orDepList, writer)
 
         print("Percentile file created for PNR {}".format(pnr_select))
+        print('-----------------------------')
     mod.elapsedTime(START_TIME)
