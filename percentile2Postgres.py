@@ -1,3 +1,7 @@
+#Use this script to load the 15th percentile files by PNR into a single Pnr2d15 table within a PostgreSQL db.
+
+#Example Usage: kristincarlson~ python ~/..TTMatrixLink_Testing -db TTMatrixLink -schema test -table3 pnr2d15 -path ./UnitTest_Percentile/
+
 #################################
 #           IMPORTS             #
 #################################
@@ -9,8 +13,8 @@ import psycopg2
 #           FUNCTIONS           #
 #################################
 
-def createExtensionList(pnr_file_path):
-    pnr_list = mod.readList(pnr_file_path)
+def createExtensionList(pnr_list_file):
+    pnr_list = mod.readList(pnr_list_file)
     extension_list = []
     for pnr in pnr_list:
         extension_name = 'PNR15_{}_destination.txt'.format(pnr)
@@ -52,7 +56,7 @@ if __name__ == '__main__':
     SCHEMA = args.SCHEMA_NAME
     TABLE3 = args.TABLE3_NAME
     PATH = args.FILE_PATH
-    PNRS = args.PNR_LIST
+    PNRList = args.PNR_LIST
 
     try:
         con = psycopg2.connect("dbname = '{}' user='aodbadmin' host='localhost' password=''".format(DB_NAME))
@@ -63,6 +67,6 @@ if __name__ == '__main__':
     #Initiate cursor object on db
     cur = con.cursor()
 
-    extensionList = createExtensionList(PNRS)
+    extensionList = createExtensionList(PNRList)
     createTable()
     insertFileInfo(extensionList)
