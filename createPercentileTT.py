@@ -24,26 +24,25 @@ from myToolsPackage import matrixLinkModule as mod
 #              deptime:{15thTT}}
 #destination:...
 #This function reads in every PNR_deptime file and creates a nested dictionary for the given PNR
-def makeNestedDict(pnr, dest_dep_list, file_name_od):
+def makeNestedDict(pnr_select, dest_dep_list, connect_field):
     # Initiate the triple nested dict structure
     nest = defaultdict(lambda: defaultdict(int))
     #Add all deptime files to the PNR dict
     for deptime in dest_dep_list:
 
-        with open ('PNR_{}_{}_{}.txt'.format(pnr, deptime, file_name_od), 'r') as input:
+        with open ('{}PNR_{}_{}.txt'.format(DIR, pnr_select, deptime), 'r') as input:
             reader = csv.DictReader(input)
 
             for row in reader:
-                nest[row[file_name_od]][row['deptime']] = row['traveltime']
+                nest[row[connect_field]][row['deptime']] = row['traveltime']
 
-    print("Created Nested Dictionary for PNR {} of {} set".format(pnr, file_name_od))
+    print("Created Nested Dictionary for PNR {}".format(pnr_select))
     return nest
 
 #A function to calculate the new travel time in 15 minute bins based on 15th percentile
-def makeCentileFile(pnr, p2d_dict, or_dep_list, writer):
+def makeCentileFile(pnr_select, p2d_dict, or_dep_list, writer):
     #Sort in ascending order
     or_dep_list_sort = sorted(or_dep_list)
-    print("Sorted deptime list", or_dep_list_sort)
 
     #Break off destinations
     for dest, timing in p2d_dict.items():
@@ -61,9 +60,8 @@ def makeCentileFile(pnr, p2d_dict, or_dep_list, writer):
                         bin15.append(int(tt))
                 #Calc 15th percentile TT and add to centile_dict
                 new_tt = calcPercentile(bin15)
-                writer.writerow([pnr, dest, dep15, new_tt])
+                writer.writerow([pnr_select, dest, dep15, new_tt])
 
-    print("Centile File Created")
     mod.elapsedTime(START_TIME)
 
 #This function calculates the bottom 15th percentile travel time ~= 85th percentile for a particular OD Pair
@@ -87,10 +85,11 @@ if __name__ == '__main__':
     START_TIME, curtime = mod.startTimer()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-pnr', '--PNRLIST_FILE', required=True, default=None)
+    parser.add_argument('-pnrlist', '--PNRLIST_FILE', required=True, default=None)
     parser.add_argument('-or_dep', '--OR_DEP_FILE', required=True, default=None)
     parser.add_argument('-dest_dep', '--DEST_DEP_FILE', required=True, default=None)
-    parser.add_argument('-od', '--OD', required=True, default=None) #Origin or destination can be typed, indicates extension.
+    parser.add_argument('-connect', '--CONNECT_FIELD', required=True, default=None) #Origin or destination can be typed
+    parser.add_argument('-dir', '--BREAKER_DIR', required=True, default=None) #Directory where the previously broken files are located
     args = parser.parse_args()
 
     #Output file fieldnames
@@ -100,7 +99,8 @@ if __name__ == '__main__':
     PNRListVar = str(args.PNRLIST_FILE)
     orDepVar = str(args.OR_DEP_FILE)
     destDepVar = str(args.DEST_DEP_FILE)
-    file_name_od = str(args.OD)
+    connectField = str(args.CONNECT_FIELD)
+    DIR = str(args.BREAKER_DIR)
 
     #Create lists from the files read into the program
     PNRList = mod.readList(PNRListVar)
@@ -108,15 +108,15 @@ if __name__ == '__main__':
     destDepList = mod.readList(destDepVar)
 
     #Create a separate percentileTT file for each PNR
-    for pnr in PNRList:
+    for pnr_select in PNRList:
+        #Open all PNR files from 6-9 AM and make a {dest:{0600:TT} nested dictionary
+        p2dDict = makeNestedDict(pnr_select, destDepList, connectField)
 
-        p2dDict = makeNestedDict(pnr, destDepList, file_name_od)
-
-        file_name = 'PNR15_{}_{}'.format(pnr, file_name_od)
+        file_name = 'PNR15_{}_destination'.format(pnr_select)
         writer = mod.mkOutput(file_name, fieldnames )
 
         # Map destinations to 15th percentile TT in 15 minute bins
-        makeCentileFile(pnr, p2dDict, orDepList, writer)
+        makeCentileFile(pnr_select, p2dDict, orDepList, writer)
 
-        print("Percentile file created for PNR {}".format(pnr))
+        print("Percentile file created for PNR {}".format(pnr_select))
     mod.elapsedTime(START_TIME)
