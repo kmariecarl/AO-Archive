@@ -178,7 +178,6 @@ def writeEntry(origin, deptime, destination_list, dest_TT_prev):
         # print('To Destination:', dest)
         # print('TT:', tt)
         sumTT = tupl[1] + tupl[0] #Add or_TT to des_tt, dest_TT includes transfer time
-        print('SumTT:', sumTT)
         #entry = [origin, deptime (07:15), or_TT, transfer, pnr, destination, dest_TT, totalTT]
         entry = [origin, deptime, tupl[1], tupl[2], tupl[3], dest, tupl[0] - tupl[2], sumTT]
         writer.writerow(entry)
