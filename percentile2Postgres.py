@@ -33,6 +33,7 @@ def insertFileInfo(extension_list):
         query = "COPY {}.{} FROM '{}{}' DELIMITER ',' CSV HEADER"
         cur.execute(query.format(SCHEMA, TABLE3, PATH, extension))
         print(cur.mogrify(query.format(SCHEMA, TABLE3, PATH, extension)))
+        mod.elapsedTime(start_time)
 
 #################################
 #           OPERATIONS          #
