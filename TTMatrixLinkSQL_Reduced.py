@@ -223,7 +223,7 @@ if __name__ == '__main__':
     cur = con.cursor()
 
     #Initiate output writer file
-    fieldnames = ['origin', 'deptime', 'or_tt', 'transfer', 'pnr', 'destination', 'dest_tt', 'total_tt']
+    fieldnames = ['origin', 'deptime', 'pnr', 'destination']
     writer = mod.mkOutput('matrices_linked_{}'.format(curtime), fieldnames)
 
     #Calculate constants
