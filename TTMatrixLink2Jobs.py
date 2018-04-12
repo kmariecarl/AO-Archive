@@ -21,6 +21,7 @@
 from myToolsPackage import matrixLinkModule as mod
 import argparse
 import psycopg2
+from collections import defaultdict
 
 #################################
 #           FUNCTIONS           #
@@ -135,21 +136,20 @@ def matchDestination(or_tt, transfer, depsum_bin_sec, pnr):
     return tt_tup_list
 
 #Place the current row's destination into threshold bins based on its travel time
-def filterTT(thresh_dict, destination, tt):
+def filterTT(destination, tt):
     #Create a list of thresholds that this destination can be reached in <= time
     applicable_thresh_list = []
     for item in THRESHOLD_LIST:
         #OTP puts TT in minutes then rounds down, the int() func. always rounds down.
         #Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
         minbin = int(tt)/60
-        minthresh = int(item)/60
+        minthresh = item/60
         if minbin < minthresh:
             #print('minbin:', minbin, 'minthresh', minthresh)
             applicable_thresh_list.append(item)
     #Once the applicable thresholds have been found, place destination into lists
     for thresh in sorted(applicable_thresh_list):
-        thresh_dict[thresh].append(destination)
-    return thresh_dict
+        THRESH_DICT[thresh].append(destination)
 
 
 
@@ -208,9 +208,8 @@ if __name__ == '__main__':
     dep2SecDict = deptime2SecDict()
     dest_num = len(destination_list)
     #Make threshold list to check travel times against.
-    THRESHOLD_LIST = ['300', '600', '900', '1200', '1500', '1800', '2100', '2400', '2700', '3000', '3300', '3600',
-                      '3900', '4200',
-                      '4500', '4800', '5100', '5400']
+    THRESHOLD_LIST = [300, 600, 900, 1200, 1500, 1800, 2100, 2400, 2700, 3000, 3300, 3600, 3900, 4200,
+                      4500, 4800, 5100, 5400]
 
     for origin in originList:
         for deptime in deptimeList:
@@ -251,27 +250,31 @@ if __name__ == '__main__':
 
             #Before you write an entry, calculate the total TT, then access by connecting jobs to destinations
             #Make one query per threshold:
+            # Create a new dict structure for the origin_deptime combo
+            THRESH_DICT = defaultdict(list)
+            #Iterate through the destinations and their respective TTs.
             for dest, tup in zip(destination_list, destTTPrev):
                 sumTT = tup[1] + tup[0]  # Add or_TT to des_tt, dest_TT includes transfer time
                 #Initiate dictionary specific to this origin and deptime combo
-                threshDict = {}
-                threshDictFilled = filterTT(threshDict, dest, sumTT)
-                for thresh, dest_list in sorted(threshDictFilled.items()):
-                    # Destination list actually needs to be a tuple to work with the WHERE IN query below
-                    dest_tup = tuple(dest_list)
-                    #Query DB for jobs that match destinations in the dest_list:
-                    query = "SELECT C000 FROM {}.{} WHERE GEOID10 IN %s"
-                    cur.execute(query, (dest_tup,)).format(SCHEMA, JOBS)
-                    jobs = cur.fetchall()
-                    jobs_list = list(sum(jobs, ()))
-                    access = sum(jobs_list)
 
-                    entry = {'label': origin, 'deptime': deptime, 'threshold': thresh, 'jobs': access}
-                    writer.writerow(entry)
+                filterTT(dest, sumTT)
+            for thresh, dest_list in sorted(THRESH_DICT.items()):
+                # Destination list actually needs to be a tuple to work with the WHERE IN query below
+                dest_tup = tuple(dest_list)
+                #Query DB for jobs that match destinations in the dest_list:
+                query = "SELECT c000 FROM test.jobs WHERE GEOID10 IN %s;"
+                cur.execute(query, (dest_tup,))
+                jobs = cur.fetchall()
+                jobs_list = list(sum(jobs, ()))
+
+                access = sum(jobs_list)
+
+                entry = {'label': origin, 'deptime': deptime, 'threshold': thresh, 'jobs': access}
+                writer.writerow(entry)
             print("Origin {} matched to jobs at deptime {}".format(origin, deptime))
 
 
             #Once the inner PNR loop finishes, the destTTPrev list contains the lowest travel times and corresponding PNRs
             #Verify that destination order matches TT array order
-            writeEntry(origin, deptime, destination_list, destTTPrev)
-            print('Minimum paths for origin: {} at deptime {} have been found.'.format(origin, deptime))
+#            writeEntry(origin, deptime, destination_list, destTTPrev)
+#            print('Minimum paths for origin: {} at deptime {} have been found.'.format(origin, deptime))
