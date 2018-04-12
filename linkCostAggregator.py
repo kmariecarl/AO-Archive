@@ -36,11 +36,11 @@ if __name__ == '__main__':
     for row in reader:
         current = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'], 'path_cost': sumlink}
         #Scenario to handle the first OD pair
-        if int(row['link_seq']) == 0 and count == 0:
+        if int(row['path_seq']) == 0 and count == 0:
             sumlink += float(row['link_cost'])
             previous = current
         #Row only written when a sequence has been finished
-        elif int(row['link_seq']) == 0 and count != 0:
+        elif int(row['path_seq']) == 0 and count != 0:
             writer.writerow(previous)
             #Reset sumlink to zero
             sumlink = 0
