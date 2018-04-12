@@ -200,7 +200,10 @@ if __name__ == '__main__':
 
     #Initiate output writer file
     fieldnames = ['label', 'deptime', 'threshold', 'jobs']
-    writer = mod.mkOutput('Linked_Matrices_wAccess_{}'.format(curtime), fieldnames)
+    writer = mod.mkDictOutput('Linked_Matrices_wAccess_{}'.format(curtime), fieldname_list=fieldnames)
+    #Initiate a second writer for outputting the final paths at each deptime to be used with the linkCostCalc and Agg procedure.
+    fieldnames2 = ['origin', 'deptime', 'pnr', 'destination']
+    writer2 = mod.mkDictOutput('Linked_Path_ID_{}'.format(curtime), fieldname_list=fieldnames2)
 
     #Calculate constants
     originList, pnrList, deptimeList, destination_list = makeLists()
@@ -258,6 +261,10 @@ if __name__ == '__main__':
                 #Initiate dictionary specific to this origin and deptime combo
 
                 filterTT(dest, sumTT)
+                #Write out path to file
+                entry2 = {'origin': origin, 'deptime': deptime, 'pnr': tup[3], 'destination': dest}
+                writer2.writerow(entry2)
+
             for thresh, dest_list in sorted(THRESH_DICT.items()):
                 # Destination list actually needs to be a tuple to work with the WHERE IN query below
                 dest_tup = tuple(dest_list)
@@ -271,6 +278,7 @@ if __name__ == '__main__':
 
                 entry = {'label': origin, 'deptime': deptime, 'threshold': thresh, 'jobs': access}
                 writer.writerow(entry)
+
             print("Origin {} matched to jobs at deptime {}".format(origin, deptime))
 
 
