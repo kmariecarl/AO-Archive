@@ -24,15 +24,19 @@ import csv
 def mpgFunction(speed):
     #start by converting speed from m/s to miles per hour
     speed_mph = float(speed) * 2.23694
-    mpg = 0.658 + (0.947 * speed_mph) - (0.009 * speed_mph)
+    mpg = 0.658 + (0.947 * speed_mph) - (0.009 * speed_mph**2)
+    print('MPG', mpg)
     return mpg
 
 def mpgAdjustment(mpg):
     mpg_adj = mpg * ADJ
+    print('MPG_ADJ', mpg_adj)
     return mpg_adj
 
 def costPerMile(mpg):
-    cost_per_mile = 1/(mpg * PRICE)
+    #Mi/Gall * 1 Gal/price = mile/cost then take reciprocal
+    cost_per_mile = 1/(mpg / PRICE)
+    print('cost per mile', cost_per_mile)
     return cost_per_mile
 
 def calcLinkCost(link_length, cost_mile):
@@ -67,7 +71,7 @@ if __name__ == '__main__':
     reader = mod.readInToDict(args.PATH_FILE)
     #Make writer
     fieldnames = ['origin', 'deptime', 'destination', 'path_seq', 'link_cost']
-    writer = mod.mkDictOutput('link_costs_matrix', fieldname_list=fieldnames)
+    writer = mod.mkDictOutput('link_costs_matrix_{}'.format(curtime), fieldname_list=fieldnames)
 
 
     for row in reader:
