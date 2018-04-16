@@ -35,6 +35,13 @@ def insertFileInfo(extension_list):
         print(cur.mogrify(query.format(SCHEMA, TABLE3, PATH, extension)))
         mod.elapsedTime(start_time)
 
+def createIndex():
+    print('Creating index origin_deptime')
+    query = "CREATE INDEX origin_deptime ON {}.{} (origin, deptime);"
+    cur.execute(query.format(SCHEMA, TABLE3))
+    print(cur.mogrify(query.format(SCHEMA, TABLE3)))
+    print('Index origin_deptime added to table {}'.format(TABLE3))
+
 #################################
 #           OPERATIONS          #
 #################################
@@ -71,3 +78,4 @@ if __name__ == '__main__':
     extensionList = createExtensionList(PNRList)
     createTable()
     insertFileInfo(extensionList)
+    createIndex()
