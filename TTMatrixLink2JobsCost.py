@@ -216,6 +216,7 @@ def filterCost(dest, a_cost, t_cost):
     print(a_cost)
     print(t_cost)
     total = a_cost + t_cost
+    #Do not include this destination in accessibility if it cannot be reached
     if total >= 2147483647:
         pass
     else:
@@ -225,6 +226,7 @@ def filterCost(dest, a_cost, t_cost):
                 applicable_cost_list.append(item)
         for cost in sorted(applicable_cost_list):
             COST_DICT[cost].append(dest)
+        print(COST_DICT)
 
 
 #Place the current row's destination into threshold bins based on its travel time
@@ -323,12 +325,14 @@ if __name__ == '__main__':
     #Initiate cursor object on db
     cur = con.cursor()
 
-    #Initiate output writer file
-    fieldnames = ['label', 'deptime', 'threshold', 'jobs']
-    writer_time = mod.mkDictOutput('Linked_wTTAccess_{}'.format(curtime), fieldname_list=fieldnames)
+
     #Initiate a second writer for outputting the final paths at each deptime to be used with the linkCostCalc and Agg procedure.
     fieldnames2 = ['label', 'deptime', 'cost', 'jobs']
     writer_cost = mod.mkDictOutput('Linked_wCostAccess_{}'.format(curtime), fieldname_list=fieldnames2)
+
+    #Initiate output writer file
+    fieldnames = ['label', 'deptime', 'threshold', 'jobs']
+    writer_time = mod.mkDictOutput('Linked_wTTAccess_{}'.format(curtime), fieldname_list=fieldnames)
 
     #Calculate constants
     originList, pnrList, deptimeList, destination_list = makeLists()
@@ -359,8 +363,9 @@ if __name__ == '__main__':
                 moneyBuckets()
                 timeBuckets()
 
-            createAccessFile(origin, deptime, THRESH_DICT, 'threshold', writer_time)
             createAccessFile(origin, deptime, COST_DICT, 'cost', writer_cost)
+            createAccessFile(origin, deptime, THRESH_DICT, 'threshold', writer_time)
+
 
 
             print("Origin {} matched to jobs at deptime {}".format(origin, deptime))
