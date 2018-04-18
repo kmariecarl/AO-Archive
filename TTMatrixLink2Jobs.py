@@ -280,6 +280,7 @@ if __name__ == '__main__':
                 writer.writerow(entry)
 
             print("Origin {} matched to jobs at deptime {}".format(origin, deptime))
+    mod.elapsedTime(start_time)
 
 
             #Once the inner PNR loop finishes, the destTTPrev list contains the lowest travel times and corresponding PNRs
