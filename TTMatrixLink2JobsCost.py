@@ -383,19 +383,19 @@ if __name__ == '__main__':
                         # Values are tuples (TT, pnr).
                         destTTList = matchDestination(int(orTT), transfer, depsumBin, pnr)
                         print('destination matched to TT:', zip(destination_list, destTTList))
-                        # A list comprehension to recreate the list of tuples with [(dest_tt_+_transfer, orTT, transfer, pnr),..(...)]
-                        destTTtransfer = [(x[0] + transfer, x[1], x[2], x[3]) for x in
-                                          destTTList]  # + transfer #Add the transfer time to all destination tt in the array.
+                        # A list comprehension to recreate the list of tuples with [(dest_tt_+_transfer_+_orTT, orTT, transfer, pnr),..(...)]
+                        destTTtransfer = [(x[0] + transfer + x[1], x[1], x[2], x[3]) for x in
+                                          destTTList]  #Add the transfer time and origin tt to all destination tt in the array.
 
                         # Check if dest_TT_prev is filled
                         if len(destTTPrev) > 0:
                             print('Destination list greater than 0')
                             # Previous way which causes a hodge-podge of PNRs to be selected--which is what we want.
                             #Here a pair is actually the entire tuple so that the orTT, pnr, transfer associated with the minimum
-                            #destTT are maintained, only the first value in the tuple (destTT) are actually compared for their
+                            #sumTT are maintained, only the first value in the tuple (destTT + transfer + orTT) are actually compared for their
                             #min value.
                             bestTT = [min(pair) for pair in zip(destTTPrev, destTTtransfer)]
-                            # bestTT contains a tuple with the minimum dest_TT + transfer and the associated or_TT, transfer (alone), PNR time.
+                            # bestTT contains a tuple with the minimum dest_TT + transfer + orTT and the associated or_TT, transfer (alone), PNR time.
                             destTTPrev = bestTT
                         # On first pass, initialize the destination-TT array and other values.
                         else:
