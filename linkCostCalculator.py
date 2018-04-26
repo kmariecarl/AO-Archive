@@ -16,6 +16,7 @@
 
 from myToolsPackage import matrixLinkModule as mod
 import argparse
+import time
 import csv
 
 #################################
@@ -48,13 +49,11 @@ def mpgFunction(speed_mph):
         adj = 0.861
     mpg = 0.658 + (0.947 * speed_mph) - (0.009 * speed_mph**2)
     mpg_adj = mpg * adj
-    print('MPG_adj', mpg_adj)
     return mpg_adj
 
 def costPerMile(mpg):
     #Mi/Gall * 1 Gal/price = mile/cost then take reciprocal
     cost_per_mile = 1/(mpg / PRICE)
-    print('cost per mile', cost_per_mile)
     return cost_per_mile
 
 
@@ -102,18 +101,20 @@ def calcVOTCost(link_time_sec):
 if __name__ == '__main__':
 
     start_time, curtime = mod.startTimer()
+    readable = time.ctime(start_time)
+    print(readable)
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
     parser.add_argument('-path', '--PATH_FILE', required=True, default=None)  #ENTER AS full file path to path_analyst file
     parser.add_argument('-mpg_adj', '--MPG_ADJUSTMENT', required=True, default=32400)  #Assume city driving adjustment of 0.8354
-    parser.add_argument('-price_per_gal', '--PRICE_PER_GALLON_REGULAR', required=True, default=232.7)  # $2.327 in MN in 2017, enter in cents (232.7 cents)
+    parser.add_argument('-price_per_gal', '--PRICE_PER_GALLON_REGULAR', required=True, default=233.5)  # $2.335 in MN in 2015, enter in cents (233.5 cents)
     parser.add_argument('-vot', '--VALUE_OF_TIME', required=True, default=1803.0)  # MnDOT research states $18.30 or 1803.0 cents
     parser.add_argument('-repaircity', '--REPAIR_COST_CITY', required=True, default=1.932) #Combined (auto + pickup) city Maintenance and Repair costs in cents per veh-mi for 2015
     parser.add_argument('-repairhwy', '--REPAIR_COST_HIGHWAY', required=True, default=1.703) #Combined (auto + pickup) highway Maintenance and Repair costs in cents per veh-mi for 2015
     parser.add_argument('-depcity', '--DEPRECIATION_COST_CITY', required=True, default=3.00) #Combined city vehicle depreciation cost for 2015
     parser.add_argument('-dephwy', '--DEPRECIATION_COST_HIGHWAY', required=True, default=2.55) #Combined highway vehicle depreciation cost for 2015
-    parser.add_argument('-irs', '--IRS_MILEAGE', required=True, default=53.5) #IRS mileage reimbursement which includes fuel and avg vehicle wear and tear (i.e. depreciation by distance)
+    parser.add_argument('-irs', '--IRS_MILEAGE', required=True, default=57.5) #IRS mileage reimbursement which includes fuel and avg vehicle wear and tear for 2015 (i.e. depreciation by distance)
 
     args = parser.parse_args()
 

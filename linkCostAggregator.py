@@ -13,6 +13,7 @@
 
 from myToolsPackage import matrixLinkModule as mod
 import argparse
+import time
 
 #################################
 #           FUNCTIONS           #
@@ -25,6 +26,8 @@ import argparse
 if __name__ == '__main__':
 
     start_time, curtime = mod.startTimer()
+    readable = time.ctime(start_time)
+    print(readable)
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
@@ -131,5 +134,6 @@ if __name__ == '__main__':
             previous['irs_cost'] = sumirs
             previous['vot_cost'] = sumvot
         count += 1
+    mod.elapsedTime(start_time)
 
 
