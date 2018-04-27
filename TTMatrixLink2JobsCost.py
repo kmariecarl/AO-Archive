@@ -83,6 +83,26 @@ def makeDeptimeSecList(deptime_list):
     deptime_sec_list = [mod.convert2Sec(i) for i in deptime_list]
     return deptime_sec_list
 
+def createPNR2D15(pnr_list, deptime_list):
+    print('Building pnr2d15 dictionary in memory...')
+    pnr2d15 = defaultdict(lambda: defaultdict(list))
+    for pnr in pnr_list:
+        for deptime in deptime_list:
+            query = """SELECT traveltime
+                           FROM {}.{}
+                           WHERE origin = %s AND deptime = %s
+                           ORDER BY DESTINATION ASC"""
+            cur.execute(query.format(SCHEMA, TABLE2), (pnr, deptime))  # next_bin,
+
+            tt = cur.fetchall()  # Listed by ordered destination
+
+            tt_tup_list = [dest_tt[0] for dest_tt in tt]
+
+            pnr2d15[pnr][deptime] = tt_tup_list
+        print('PNR {} has been added to PNR2d15 dictionary'.format(pnr))
+        mod.elapsedTime(start_time)
+    return pnr2d15
+
 
 #Query the o2pnr matrix for matching origin, deptime, pnr combo
 def matchOrigin(origin, deptime, pnr):
@@ -92,11 +112,11 @@ def matchOrigin(origin, deptime, pnr):
     cur.execute(query.format(SCHEMA,TABLE1), (origin, deptime, pnr))
     tt = cur.fetchall()
 
-    return tt[0][0]
+    return int(tt[0][0])
 
 #Place depsum values into a 15 minute bin. Ex. 6:05 will get placed in the 6:15 bin.
 #Bins are rounded up to allow for transfer time between origin egress to destination ingress
-def linkBins(deptime_sec_list_sort, depsum):
+def linkBins(depsum):
     ##Top portion remains commented out until larger matrices are calculated
     # more_time = [900*i for i in range(1, 7)]
     # last_time = deptime_list_sort[-1] #Grab last time in list : 9:00 = 32400
@@ -105,93 +125,31 @@ def linkBins(deptime_sec_list_sort, depsum):
     #     extend_deptime_list_sort.append((last_time+k))
     # print('Extended deptime list:', extend_deptime_list_sort)
     # Assign depsum to the 15 minute bin
-    for index, dptm in enumerate(deptime_sec_list_sort): #enumerate(extend_deptime_list_sort):
+    for index, dptm in enumerate(DEPTIME_SEC_LIST): #enumerate(extend_deptime_list_sort):
         next = index + 1
-        if next < len(deptime_sec_list_sort): #len(extend_deptime_list_sort):
-            if depsum > dptm and depsum <=  deptime_sec_list_sort[next]: #extend_deptime_list_sort[next]:
+        if next < len(DEPTIME_SEC_LIST): #len(extend_deptime_list_sort):
+            if depsum > dptm and depsum <=  DEPTIME_SEC_LIST[next]: #extend_deptime_list_sort[next]:
                 # Depsum_bin is in the form of seconds!
-                depsum_bin = deptime_sec_list_sort[next] #extend_deptime_list_sort[next]
+                depsum_bin = DEPTIME_SEC_LIST[next] #extend_deptime_list_sort[next]
                 return depsum_bin #Seconds, contains times in the 15 minutes less than this depsum_bin
 
 #Each use of this function returns an array of TT that are in order of their destination. MaxTT are included
 #so that the array size always equals 'dest_num'.
-def matchDestination(or_tt, transfer, depsum_bin_sec, pnr):
-    #Sort traveltimes into list where they are at the same index everytime. The maxTT value is listed for any dest
-    #that cannot be reached.
-
-    #Convert seconds back to time which is
-    print('Before converting seconds and finding bins')
-    mod.elapsedTime(start_time)
-    depsum_bin = mod.back2Time(depsum_bin_sec)
-    #next_bin_sec = depsum_bin_sec + 900
-    #next_bin = mod.back2Time(next_bin_sec)
-    print('After converting seconds and finding bins')
-    mod.elapsedTime(start_time)
-    #Because the pnr2d15 matrix is only indexed on deptime and origin and not destination, the resulting array of tt will
-    #be stored in memory while the ordering happens. If indexed on the destination, this memory process would not happen.
-    query = """SELECT traveltime
-               FROM {}.{}
-               WHERE deptime = %s AND origin = %s
-               ORDER BY DESTINATION"""
-    print('Execute query to gather destinations')
-    mod.elapsedTime(start_time)
-    cur.execute(query.format(SCHEMA,TABLE2), (depsum_bin, pnr))  #next_bin,
-    print('Destinations recieved')
-    mod.elapsedTime(start_time)
-    tt = cur.fetchall()  #Listed by ordered destination
-    print('Fetch destinations')
-    mod.elapsedTime(start_time)
-    # print('This is tt_fetchall', tt)
-
-    #Produces [(dest_tt, or_tt, transfer, pnr), (dest_tt, or_tt, transfer, pnr)]
-    tt_tup_list = [(dest_tt[0], or_tt, transfer, pnr) for dest_tt in tt]
-    #print('This is tt_tup_list', tt_tup_list)
+def matchDestination(pnr, deptime, or_tt_trans):
+    tt_array = PNR2D15[pnr][deptime]
+    # Add the transfer time and origin tt to all destination tt in the array.
+    tt_tup_list = [dest_tt + or_tt_trans for dest_tt in tt_array]
 
     #Make sure the origin + deptime combo can be matched with destinations
-    if len(tt_tup_list) == 0:
-        print('No destinations found for this Origin + Deptime combo')
-        tt_tup_list = [(2147483647, or_tt, transfer, pnr)] * dest_num
+    #if len(tt_tup_list) == 0:
+    #    print('No destinations found for this Origin + Deptime combo')
+    #    tt_tup_list = [2147483647] * dest_num
 
-    if len(tt_tup_list) != dest_num:
-        print('Tup list:', len(tt_tup_list), 'Dest num:', print(dest_num))
-        print('ERROR!!')
+    #if len(tt_tup_list) != dest_num:
+    #    print('Tup list:', len(tt_tup_list), 'Dest num:', print(dest_num))
+    #    print('ERROR!!')
 
     return tt_tup_list
-
-# def returnPrevailingMinTT(origin, deptime, pnr, destTTPrev):
-#     orTT = matchOrigin(origin, deptime, pnr)
-#     depsum = dep2SecDict[deptime] + orTT
-#
-#     # If depsum is past the calculation window (9:00 AM), do not link paths. Instead assign maxtime.
-#     if depsum < LIMIT:
-#         # Choose dest_deptime based on closest 15 min bin.
-#         depsumBin = linkBins(deptimeSecList, depsum)
-#         transfer = depsumBin - depsum  # Int - int = int
-#         # Presumably this function returns all destinations with their tt in the set, in the same order.
-#         # Values are tuples (TT, pnr).
-#         destTTList = matchDestination(orTT, transfer, depsumBin, pnr)
-#         # A list comprehension to recreate the list of tuples with [(dest_tt_+_transfer, orTT, transfer, pnr),..(...)]
-#         destTTtransfer = [(x[0] + transfer, x[1], x[2], x[3]) for x in
-#                           destTTList]  # + transfer #Add the transfer time to all destination tt in the array.
-#
-#         # Check if dest_TT_prev is filled
-#         if len(destTTPrev) > 0:
-#             # Previous way which causes a hodge-podge of PNRs to be selected--which is what we want.
-#             bestTT = [min(pair) for pair in zip(destTTPrev, destTTtransfer)]
-#             # bestTT contains a tuple with the minimum dest_TT + transfer and the associated or_TT, transfer (alone), PNR time.
-#             destTTPrev = bestTT
-#         # On first pass, initialize the destination-TT array and other values.
-#         else:
-#             destTTPrev = destTTtransfer
-#
-#     # Assign destTTprev to maxtime because this origin cannot reach the given PNR before 9:00.
-#     else:
-#         print('Origin {} reaches PNR {} after time limit {}'.format(origin, pnr, LIMIT))
-#         # Assign arbitrary transfer value because the destination cannot be reached anyway.
-#         transfer = 0
-#         destTTPrev = [(2147483647, orTT, transfer, pnr)] * dest_num
-#
-#     return destTTPrev
 
 
 #Place destination into cost thresholds if both the origin can reach a PNR and from the PNR to a destination can be reached.
@@ -312,16 +270,6 @@ def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
         entry = {'label': origin, 'deptime': deptime, '{}'.format(threshold_type): thresh, 'jobs': access}
         writer.writerow(entry)
 
-
-# #This function writes out multiple destination rows for the fixed origin, deptime combo that was the best match for the
-# #selected pnr.
-# def writeEntry(origin, deptime, destination_list, dest_TT_prev):
-#     for dest, tupl in zip(sorted(destination_list), dest_TT_prev):
-#         sumTT = tupl[1] + tupl[0] #Add or_TT to des_tt, dest_TT includes transfer time
-#         #entry = [origin, deptime (07:15), or_TT, transfer, pnr, destination, dest_TT, totalTT]
-#         entry = [origin, deptime, tupl[1], tupl[2], tupl[3], dest, tupl[0] - tupl[2], sumTT]
-#         writer.writerow(entry)
-
 #################################
 #           OPERATIONS          #
 #################################
@@ -387,13 +335,17 @@ if __name__ == '__main__':
     deptimeList = mod.readList(args.DEPTIME_LIST)
     destination_list = mod.readList(args.DESTINATION_LIST)
 
-    deptimeSecList = makeDeptimeSecList(deptimeList)
+    DEPTIME_SEC_LIST = makeDeptimeSecList(deptimeList)
     dep2SecDict = deptime2SecDict()
     dest_num = len(destination_list)
     #Make threshold list to check travel times against.
     THRESHOLD_LIST = [300, 600, 900, 1200, 1500, 1800, 2100, 2400, 2700, 3000, 3300, 3600, 3900, 4200,
                       4500, 4800, 5100, 5400]
     THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
+
+    #Create pnr2d15 dict in memory
+    PNR2D15 = createPNR2D15(pnrList, deptimeList)
+
 
     for origin in originList:
 
@@ -407,30 +359,27 @@ if __name__ == '__main__':
 
                 #Handle origins that cannot reach the provided PNR
                 if orTT is not None:
-                    depsum = dep2SecDict[deptime] + int(orTT)
+                    depsum = dep2SecDict[deptime] + orTT
 
                     # If depsum is past the calculation window (9:00 AM), do not link paths. Instead assign maxtime.
                     if depsum < LIMIT:
                         #print('depsum less than limit')
                         # Choose dest_deptime based on closest 15 min bin.
-                        depsumBin = linkBins(deptimeSecList, depsum)
+                        depsumBin = linkBins(depsum)
 
                         transfer = depsumBin - depsum  # Int - int = int
 
+                        orTT_trans = orTT + transfer
+
                         # Presumably this function returns all destinations with their tt in the set, in the same order.
                         # Values are tuples (TT, pnr).
-                        print('Before destinations are matched')
-                        mod.elapsedTime(start_time)
-                        destTTList = matchDestination(int(orTT), transfer, depsumBin, pnr)
-                        print('After destinations are matched')
-                        mod.elapsedTime(start_time)
                         #destTTList = [destTT, orTT, Transfer, PNR]
-                        # A list comprehension to recreate the list of tuples with [(dest_tt_+_transfer_+_orTT, orTT, transfer, pnr),..(...)]
-                        totalTT = [(x[0] + x[2] + x[1], x[1], x[2], x[3]) for x in
-                                          destTTList ]  #Add the transfer time and origin tt to all destination tt in the array.
-                        print('List comprehension to calc totalTT')
-                        mod.elapsedTime(start_time)
+                        # print('match destination')
+                        # mod.elapsedTime(start_time)
+                        destTTList = matchDestination(pnr, deptime, orTT_trans)
                         # Check if dest_TT_prev is filled
+                        # print('Find min tt')
+                        # mod.elapsedTime(start_time)
                         if len(destTTPrev) > 0:
                             #print('Destination list greater than 0')
                             # Previous way which causes a hodge-podge of PNRs to be selected--which is what we want.
@@ -438,32 +387,33 @@ if __name__ == '__main__':
                             #sumTT are maintained, only the first value in the tuple (destTT + transfer + orTT) are actually compared for their
                             #min value.
 
-                            bestTT = [min(pair) for pair in zip(destTTPrev, totalTT)]
-                            print('Found best TT array')
-                            mod.elapsedTime(start_time)
+                            bestTT = [min(pair) for pair in zip(destTTPrev, destTTList)]
 
-                            # bestTT contains a tuple with the minimum dest_TT + transfer + orTT and the associated or_TT, transfer (alone), PNR time.
+                            #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, destTTList)]
+
                             destTTPrev = bestTT
                         # On first pass, initialize the destination-TT array and other values.
                         else:
                             #print('Initialize destination tt list')
-                            destTTPrev = totalTT
+                            destTTPrev = destTTList
 
                     # Assign destTTprev to maxtime because this origin cannot reach the given PNR before 9:00.
                     else:
                         #print('Origin {} reaches PNR {} after time limit {}'.format(origin, pnr, LIMIT))
                         # Assign arbitrary transfer value because the destination cannot be reached anyway.
-                        transfer = 0
-                        destTTPrev = [(2147483647, int(orTT), transfer, pnr)] * dest_num
+                        #transfer = 0
+                        destTTPrev = [2147483647] * dest_num
+                        #destTTPrev = [(2147483647, orTT, transfer, pnr)] * dest_num
                 else:
                     #print('Origin {} cannot reach PNR {} within 30 minutes'.format(origin, pnr))
                     # Assign arbitrary transfer value because the destination cannot be reached anyway.
-                    transfer = 0
-                    orTT = 2147483647
-                    destTTPrev = [(2147483647, orTT, transfer, pnr)] * dest_num
+                    destTTPrev = [2147483647] * dest_num
+                    #transfer = 0
+                    #orTT = 2147483647
+                    #destTTPrev = [(2147483647, orTT, transfer, pnr)] * dest_num
 
-                print('PNR {} Finished'.format(pnr))
-                mod.elapsedTime(start_time)
+                # print('PNR {} Finished'.format(pnr))
+                # mod.elapsedTime(start_time)
 
 
             #Before you write an entry, calculate the total TT, then access by connecting jobs to destinations
@@ -472,20 +422,21 @@ if __name__ == '__main__':
             THRESH_DICT = defaultdict(list)
             COST_DICT = defaultdict(list)
             #Iterate through the destinations and their respective TTs.
-
-            for dest, tup in zip(sorted(destination_list), destTTPrev):
+            # print('Begin filtering dest and tt')
+            # mod.elapsedTime(start_time)
+            for dest, totalTT in zip(destination_list, destTTPrev):
                 #moneyBuckets(origin, deptime, dest, tup)
                 #timeBuckets(dest, tup)
                 #print('destination and tt tuple:', dest, tup[0], tup[1], tup[2], tup[3])
-                if tup[0] < 2147483647:
-                    filterTT(dest, tup[0])
+                if totalTT < 2147483647:
+                    filterTT(dest, totalTT)
 
             #This ensures that each origin has all thresholds listed even if no jobs can be reached in the given time frame
             for item_again in THRESHOLD_LIST:
                 if item_again not in THRESH_DICT:
                     THRESH_DICT[item_again].append(0)
-
-            print(THRESH_DICT)
+            # print('Write results to file')
+            # mod.elapsedTime(start_time)
 
             #writeAccessFile(origin, deptime, COST_DICT, 'cost', writer_cost)
             writeAccessFile(origin, deptime, THRESH_DICT, 'threshold', writer_time)
