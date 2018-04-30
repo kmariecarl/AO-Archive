@@ -26,6 +26,7 @@ import argparse
 import psycopg2
 from collections import defaultdict
 import time
+from numpy import minimum, array
 
 #################################
 #           FUNCTIONS           #
@@ -76,10 +77,10 @@ def deptime2SecDict():
 
     return dep2sec
 
-def makeDeptimeSecList(deptime_list):
-    #The list coming in should already be sorted in ascending order
-    deptime_sec_list = [mod.convert2Sec(i) for i in deptime_list]
-    return deptime_sec_list
+# def makeDeptimeSecList(deptime_list):
+#     #The list coming in should already be sorted in ascending order
+#     deptime_sec_list = [mod.convert2Sec(i) for i in deptime_list]
+#     return deptime_sec_list
 
 def createPNR2D15(pnr_list, deptime_list):
     print('Building pnr2d15 dictionary in memory...')
@@ -131,92 +132,78 @@ def linkBins(depsum):
                 depsum_bin = DEPTIME_SEC_LIST[next] #extend_deptime_list_sort[next]
                 return depsum_bin #Seconds, contains times in the 15 minutes less than this depsum_bin
 
-#Each use of this function returns an array of TT that are in order of their destination. MaxTT are included
-#so that the array size always equals 'dest_num'.
-# def matchDestination(pnr, dest_deptime, or_tt_trans):
-#     #tt_array = PNR2D15[pnr][dest_deptime]
-#     # Add the transfer time and origin tt to all destination tt in the array.
-#     total_tt_list = [dest_tt + or_tt_trans for dest_tt in PNR2D15[pnr][dest_deptime]]  #tt_array]
+
 #
-#     return total_tt_list
-
-
-#Place destination into cost thresholds if both the origin can reach a PNR and from the PNR to a destination can be reached.
-def moneyBuckets(origin, deptime, dest, tup):
-    # Process for monetary thresholds
-    #Assuming that the or_deptime combo can reach at least one PNR within 30 minutes
-    a_cost = returnAutoCost(origin, deptime, tup[3])
-    print('Origin {} at deptime {} to PNR {} costs {}'.format(origin, deptime, tup[3], a_cost))
-    if a_cost is not None:
-        t_cost = returnTransitCost(tup[0])
-        print('PNR {} to destination {} using transit costs {}'.format(tup[3], dest, t_cost))
-        if t_cost is not None:
-            filterCost(dest, a_cost, t_cost)# Put destination into each of the monetary bins $2, $4, etc.
-        else:
-            pass
-    else:
-        pass
-
-#This function matches auto path cost info from the DB to the selected or_dep_pnr combo. The cost already has value of
-#time factored in, along with fuel price, driving environment, etc.
-def returnAutoCost(origin, deptime, pnr):
-    query = """SELECT {} 
-               FROM {}.{} 
-               WHERE CAST(origin as BIGINT) = %s 
-               AND CAST(deptime AS INT) = %s 
-               AND CAST(destination AS INT) = %s;"""
-    cur.execute(query.format(SCENARIO, SCHEMA, COSTS), (str(origin), deptime, pnr))
-    a = cur.fetchone()
-    #This is should only occur in test situation where the links I have path_costs for only start at 7:00 am.
-    if a is None:
-        pass
-        # a_cost = 200000 #No information at the deptime
-
-    else:
-        a_cost = a[0] #This should return a single value
-
-        return a_cost
-
-#This function returns the travel cost based on the constant fare and a VOT calculation done internally.
-#The time includes the transfer time.
-def returnTransitCost(destTT_transfer):
-    if destTT_transfer != 2147483647:
-        #If the optional VOT value is provided, the user would like to calculate transit costs including VOT.
-        if VOT:
-            # VOT for business travel is considered 100% of wage and for the US on average that value is $27.07 /person-hour, for MN: $18.03
-            person_hours = round((destTT_transfer / 3600), 4)
-            fare = 325  # $3.25 rush hour
-            t_cost = (person_hours * VOT) + fare  # Returns a value in cents
-            return t_cost
-        else:
-            fare = 325
-            t_cost = fare
-            return t_cost
-
-    else:
-        pass
-
-#This function places the PNR scenario path cost into appropriate monetary cost bins.
-def filterCost(dest, a_cost, t_cost):
-    total = a_cost + t_cost
-
-    applicable_cost_list = []
-    non_applicable_cost_list = []
-    for item in THRESHOLD_COST_LIST:
-        if total < item:
-            applicable_cost_list.append(item)
-        else:
-            non_applicable_cost_list.append(item)
-    for cost in sorted(applicable_cost_list):
-        COST_DICT[cost].append(dest)
-    for empty_cost in sorted(non_applicable_cost_list):
-        COST_DICT[empty_cost].append(None)
-
-def timeBuckets(dest, tup):
-    # Process for travel time thresholds
-    sumTT = tup[0]  # Add or_TT to des_tt, dest_TT includes transfer time
-    # Initiate dictionary specific to this origin and deptime combo
-    filterTT(dest, sumTT)
+# #Place destination into cost thresholds if both the origin can reach a PNR and from the PNR to a destination can be reached.
+# def moneyBuckets(origin, deptime, dest, tup):
+#     # Process for monetary thresholds
+#     #Assuming that the or_deptime combo can reach at least one PNR within 30 minutes
+#     a_cost = returnAutoCost(origin, deptime, tup[3])
+#     print('Origin {} at deptime {} to PNR {} costs {}'.format(origin, deptime, tup[3], a_cost))
+#     if a_cost is not None:
+#         t_cost = returnTransitCost(tup[0])
+#         print('PNR {} to destination {} using transit costs {}'.format(tup[3], dest, t_cost))
+#         if t_cost is not None:
+#             filterCost(dest, a_cost, t_cost)# Put destination into each of the monetary bins $2, $4, etc.
+#         else:
+#             pass
+#     else:
+#         pass
+#
+# #This function matches auto path cost info from the DB to the selected or_dep_pnr combo. The cost already has value of
+# #time factored in, along with fuel price, driving environment, etc.
+# def returnAutoCost(origin, deptime, pnr):
+#     query = """SELECT {}
+#                FROM {}.{}
+#                WHERE CAST(origin as BIGINT) = %s
+#                AND CAST(deptime AS INT) = %s
+#                AND CAST(destination AS INT) = %s;"""
+#     cur.execute(query.format(SCENARIO, SCHEMA, COSTS), (str(origin), deptime, pnr))
+#     a = cur.fetchone()
+#     #This is should only occur in test situation where the links I have path_costs for only start at 7:00 am.
+#     if a is None:
+#         pass
+#         # a_cost = 200000 #No information at the deptime
+#
+#     else:
+#         a_cost = a[0] #This should return a single value
+#
+#         return a_cost
+#
+# #This function returns the travel cost based on the constant fare and a VOT calculation done internally.
+# #The time includes the transfer time.
+# def returnTransitCost(destTT_transfer):
+#     if destTT_transfer != 2147483647:
+#         #If the optional VOT value is provided, the user would like to calculate transit costs including VOT.
+#         if VOT:
+#             # VOT for business travel is considered 100% of wage and for the US on average that value is $27.07 /person-hour, for MN: $18.03
+#             person_hours = round((destTT_transfer / 3600), 4)
+#             fare = 325  # $3.25 rush hour
+#             t_cost = (person_hours * VOT) + fare  # Returns a value in cents
+#             return t_cost
+#         else:
+#             fare = 325
+#             t_cost = fare
+#             return t_cost
+#
+#     else:
+#         pass
+#
+# #This function places the PNR scenario path cost into appropriate monetary cost bins.
+# def filterCost(dest, a_cost, t_cost):
+#     total = a_cost + t_cost
+#
+#     applicable_cost_list = []
+#     non_applicable_cost_list = []
+#     for item in THRESHOLD_COST_LIST:
+#         if total < item:
+#             applicable_cost_list.append(item)
+#         else:
+#             non_applicable_cost_list.append(item)
+#     for cost in sorted(applicable_cost_list):
+#         COST_DICT[cost].append(dest)
+#     for empty_cost in sorted(non_applicable_cost_list):
+#         COST_DICT[empty_cost].append(None)
 
 #Place the current row's destination into threshold bins based on its travel time
 #If destination cannot be reached, then do not include in output.
@@ -233,7 +220,7 @@ def filterTT(destination, tt):
             applicable_thresh_list.append(item)
 
     #Once the applicable thresholds have been found, place destination into lists
-    for thresh in sorted(applicable_thresh_list):
+    for thresh in applicable_thresh_list:
         THRESH_DICT[thresh].append(destination)
 
 
@@ -241,7 +228,7 @@ def filterTT(destination, tt):
 #then write to the provided writer file.
 def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
     #For each threshold, calculate accessibility
-    for thresh, dest_list in sorted(threshold_dict.items()):
+    for thresh, dest_list in threshold_dict.items():
 
         # Destination , list actually needs to be a tuple to work with the WHERE IN query below
         dest_tup = tuple(dest_list)
@@ -297,10 +284,11 @@ if __name__ == '__main__':
     TABLE1 = args.TABLE1_NAME
     TABLE2 = args.TABLE2_NAME
     JOBS = args.JOBS_TABLE_NAME
+    LIMIT = int(args.CALC_LIMIT)
     # COSTS = args.PATH_COST_TABLE_NAME
     # SCENARIO = args.SCENARIO
     # VOT = int(args.VALUE_OF_TIME)
-    LIMIT = int(args.CALC_LIMIT)
+
 
     try:
         con = psycopg2.connect("dbname = '{}' user='aodbadmin' host='localhost' password=''".format(DB_NAME))
@@ -327,12 +315,16 @@ if __name__ == '__main__':
     deptimeList = mod.readList(args.DEPTIME_LIST)
     destination_list = mod.readList(args.DESTINATION_LIST)
 
-    DEPTIME_SEC_LIST = makeDeptimeSecList(deptimeList)
-    dep2SecDict = deptime2SecDict()
+    DEPTIME_SEC_LIST = [mod.convert2Sec(i) for i in deptimeList]
+
+
+    DEP2_SEC_DICT = deptime2SecDict()
     dest_num = len(destination_list)
     #Make threshold list to check travel times against.
     THRESHOLD_LIST = [300, 600, 900, 1200, 1500, 1800, 2100, 2400, 2700, 3000, 3300, 3600, 3900, 4200,
                       4500, 4800, 5100, 5400]
+    THRESHOLD_LIST_MINUTE = [x/60 for x in THRESHOLD_LIST]
+
     THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
 
     #Create pnr2d15 dict in memory
@@ -350,12 +342,13 @@ if __name__ == '__main__':
 
                 orTT = matchOrigin(origin, deptime, pnr)
 
-                #If origin cannot reach the chosen PNR, pick a new PNR
+                #If origin cannot reach the chosen PNR in 30 minutes, pick a new PNR
                 if orTT is not None:
-                    depsum = dep2SecDict[deptime] + orTT
+                    depsum = DEP2_SEC_DICT[deptime] + orTT
 
                     # If depsum is past the calculation window (9:00 AM), do not link paths.
                     if depsum < LIMIT:
+
                         # Choose dest_deptime based on closest 15 min bin.
                         depsumBin= linkBins(depsum)
                         destDeptime = mod.back2Time(depsumBin)
@@ -363,47 +356,48 @@ if __name__ == '__main__':
                         #Time from origin and transfer (int)  = originTT (int) + transfer (int)
                         orTT_trans = orTT + (depsumBin - depsum)
 
-                        print('Find destinations and bestTT', time.time() - t0)
-                        total_tt_generator = (dest_tt + orTT_trans for dest_tt in PNR2D15[pnr][destDeptime])
-                        # Check if destTTPrev is filled
+
+                        total_tt_generator = [dest_tt + orTT_trans for dest_tt in PNR2D15[pnr][destDeptime]]
+
+                        # Check if destTTPrev is filled, signal variable used to due to generator function
                         if signal > 0:
 
+                            #bestTT = minimum(destTTPrev, total_tt_generator)
                             bestTT = [min(pair) for pair in zip(destTTPrev, total_tt_generator)]
-                            print('Done finding destinations and bestTT', time.time() - t0)
+
                             #Alternative for tuples:
                             #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, destTTList)]
 
                             destTTPrev = bestTT
                         # On first pass, initialize the destination-TT array and other values.
                         else:
-                            print('Initialize destination tt list')
                             destTTPrev = total_tt_generator
                             signal = 1
 
 
-            #Before you write an entry, calculate the total TT, then access by connecting jobs to destinations
-            #Make one query per threshold:
+            #Before you write an entry, calculate access by connecting jobs to destinations
+            #Make one query to jobs db per threshold:
             # Create a new dict structure for the origin_deptime combo
-            print('Begin filtering', time.time() - t0)
+
             THRESH_DICT = defaultdict(list)
             COST_DICT = defaultdict(list)
             #Iterate through the destinations and their respective TTs.
             for dest, totalTT in zip(destination_list, destTTPrev):
-                print('Dest:', dest)
-                print('TotalTT:', totalTT)
                 #moneyBuckets(origin, deptime, dest, tup)
-                #timeBuckets(dest, tup)
 
+                #Only assign jobs where destination can be reached
                 if totalTT < 2147483647:
                     filterTT(dest, totalTT)
 
+
             #This ensures that each origin has all thresholds listed even if no jobs can be reached in the given time frame
-            for item_again in THRESHOLD_LIST:
-                if item_again not in THRESH_DICT:
-                    THRESH_DICT[item_again].append(0)
+            for thresh in THRESHOLD_LIST:
+                if thresh not in THRESH_DICT:
+                    THRESH_DICT[thresh].append(0)
 
             #writeAccessFile(origin, deptime, COST_DICT, 'cost', writer_cost)
             writeAccessFile(origin, deptime, THRESH_DICT, 'threshold', writer_time)
+
 
 
         print('Origin {} finished'.format(origin), time.time() - t0)
