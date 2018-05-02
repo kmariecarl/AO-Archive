@@ -24,7 +24,7 @@
 from myToolsPackage import matrixLinkModule as mod
 import argparse
 import psycopg2
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import time
 from numpy import minimum, array
 
@@ -38,23 +38,23 @@ def makeLists():
     #Faster way to select unique list of PNRs, deptimes, Destinations
     cur.execute("SELECT {}.{}.origin FROM {}.{} GROUP BY origin;".format(SCHEMA,TABLE1, SCHEMA, TABLE1))
     origins = cur.fetchall()
-    origin_list = [x[0] for x in origins]
-    print('Origin list created', mod.elapsedTime(start_time))
+    origin_list = [str(x[0]) for x in origins]
+    print('Origin list created', time.time() - t0)
 
     cur.execute("SELECT {}.{}.destination FROM {}.{} GROUP BY destination;".format(SCHEMA, TABLE1, SCHEMA, TABLE1))
     pnrs = cur.fetchall()
-    pnr_list = [x[0] for x in pnrs]
-    print('PNR list created', mod.elapsedTime(start_time))
+    pnr_list = [str(x[0]) for x in pnrs]
+    print('PNR list created', time.time() - t0)
 
-    cur.execute("SELECT {}.{}.deptime FROM {}.{} GROUP BY deptime ORDER BY deptime ASC;".format(SCHEMA,TABLE1, SCHEMA,TABLE1))
+    cur.execute("SELECT {}.{}.deptime_sec FROM {}.{} GROUP BY deptime_sec ORDER BY deptime_sec;".format(SCHEMA,TABLE1, SCHEMA,TABLE1))
     or_dep = cur.fetchall()
-    or_dep_list = [x[0] for x in or_dep]
-    print('Deptime list created', mod.elapsedTime(start_time))
+    or_dep_list = [int(x[0]) for x in or_dep]
+    print('Deptime list created', time.time() - t0)
 
-    cur.execute("SELECT {}.{}.destination FROM {}.{} GROUP BY destination;".format(SCHEMA,TABLE2, SCHEMA,TABLE2))
+    cur.execute("SELECT {}.{}.destination FROM {}.{} GROUP BY destination ORDER BY destination ASC;".format(SCHEMA,TABLE2, SCHEMA,TABLE2))
     dest = cur.fetchall()
-    dest_list = [x[0] for x in dest]
-    print('Destination list created', mod.elapsedTime(start_time))
+    dest_list = [str(x[0]) for x in dest]
+    print('Destination list created', time.time() - t0)
 
     return origin_list, pnr_list, or_dep_list, dest_list
 
@@ -77,37 +77,35 @@ def deptime2SecDict():
 
     return dep2sec
 
-# def makeDeptimeSecList(deptime_list):
-#     #The list coming in should already be sorted in ascending order
-#     deptime_sec_list = [mod.convert2Sec(i) for i in deptime_list]
-#     return deptime_sec_list
-
+#This function relys on the db structure of the tt matrices already imported into postgresql.
+#Once the tt array has been extracted, convert to numpy array.
 def createPNR2D15(pnr_list, deptime_list):
     print('Building pnr2d15 dictionary in memory...')
     pnr2d15 = defaultdict(lambda: defaultdict(list))
     for pnr in pnr_list:
         for deptime in deptime_list:
+
             query = """SELECT traveltime
                            FROM {}.{}
-                           WHERE origin = %s AND deptime = %s
-                           ORDER BY DESTINATION ASC"""
+                           WHERE origin = %s AND deptime_sec = %s
+                           ORDER BY destination ASC"""
             cur.execute(query.format(SCHEMA, TABLE2), (pnr, deptime))  # next_bin,
 
             tt = cur.fetchall()  # Listed by ordered destination
 
-            tt_tup_list = [dest_tt[0] for dest_tt in tt]
+            tt_array = array([dest_tt[0] for dest_tt in tt])
 
-            pnr2d15[pnr][deptime] = tt_tup_list
+            pnr2d15[pnr][deptime] = tt_array
         print('PNR {} has been added to PNR2d15 dictionary'.format(pnr))
         mod.elapsedTime(start_time)
     return pnr2d15
 
 
-#Query the o2pnr matrix for matching origin, deptime, pnr combo
+#Query the o2pnr matrix for matching origin, deptime_sec, pnr combo
 def matchOrigin(origin, deptime, pnr):
     query = """SELECT traveltime
                FROM {}.{}
-               WHERE origin = %s AND deptime = %s AND destination = %s;"""
+               WHERE origin = %s AND deptime_sec = %s AND destination = %s;"""
     cur.execute(query.format(SCHEMA,TABLE1), (origin, deptime, pnr))
     tt = cur.fetchall()
 
@@ -115,7 +113,7 @@ def matchOrigin(origin, deptime, pnr):
 
 #Place depsum values into a 15 minute bin. Ex. 6:05 will get placed in the 6:15 bin.
 #Bins are rounded up to allow for transfer time between origin egress to destination ingress
-def linkBins(depsum):
+def linkBins(depsum, deptime_list):
     ##Top portion remains commented out until larger matrices are calculated
     # more_time = [900*i for i in range(1, 7)]
     # last_time = deptime_list_sort[-1] #Grab last time in list : 9:00 = 32400
@@ -124,12 +122,12 @@ def linkBins(depsum):
     #     extend_deptime_list_sort.append((last_time+k))
     # print('Extended deptime list:', extend_deptime_list_sort)
     # Assign depsum to the 15 minute bin
-    for index, dptm in enumerate(DEPTIME_SEC_LIST):
+    for index, dptm in enumerate(deptime_list):
         next = index + 1
-        if next < len(DEPTIME_SEC_LIST):
-            if depsum > dptm and depsum <=  DEPTIME_SEC_LIST[next]:
+        if next < len(deptime_list):
+            if depsum > dptm and depsum <=  deptime_list[next]:
                 # Depsum_bin is in the form of seconds!
-                depsum_bin = DEPTIME_SEC_LIST[next] #extend_deptime_list_sort[next]
+                depsum_bin = deptime_list[next] #extend_deptime_list_sort[next]
                 return depsum_bin #Seconds, contains times in the 15 minutes less than this depsum_bin
 
 
@@ -207,45 +205,51 @@ def linkBins(depsum):
 
 #Place the current row's destination into threshold bins based on its travel time
 #If destination cannot be reached, then do not include in output.
-def filterTT(destination, tt):
-    #Create a list of thresholds that this destination can be reached in <= time
-    applicable_thresh_list = []
-    for item in THRESHOLD_LIST:
-        #OTP puts TT in minutes then rounds down, the int() func. always rounds down.
-        #Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
-        minbin = tt/60
-        minthresh = item/60
-        if minbin < minthresh:
+#Output is an ordered dictionary mapping threshold to list of GEOIDs that can be reached
+def filterTT(thresh_dict, destination, tt):
+    signal = 0
+    # OTP puts TT in minutes then rounds down, the int() func. always rounds down.
+    # Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
+    minbin = tt / 60
+    #Place destination into only the first threshold that allows that destination to be reached
+    while signal == 0:
+        for thresh in THRESHOLD_LIST_MINUTE:
 
-            applicable_thresh_list.append(item)
+            if minbin < thresh:
+                thresh_dict[thresh].append(destination)
+                signal = 1
 
-    #Once the applicable thresholds have been found, place destination into lists
-    for thresh in applicable_thresh_list:
-        THRESH_DICT[thresh].append(destination)
+    return thresh_dict
 
 
 #This function evaluates the threshold dictionary provided and returns the jobs that match with the given destination list
 #then write to the provided writer file.
 def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
     #For each threshold, calculate accessibility
+    access_prev = 0
+    #Each destination list only contains the new destinations that can be reached at each successive threshold.
     for thresh, dest_list in threshold_dict.items():
+        if len(dest_list) > 0:
 
-        # Destination , list actually needs to be a tuple to work with the WHERE IN query below
-        dest_tup = tuple(dest_list)
+            # Destination , list actually needs to be a tuple to work with the WHERE IN query below
+            dest_tup = tuple(dest_list)
 
-        # Query DB for jobs that match destinations in the dest_list:
-        query = """SELECT c000 
-                   FROM {}.{} 
-                   WHERE GEOID10 IN %s;"""
-        cur.execute(query.format(SCHEMA, JOBS), (dest_tup,))
-        jobs = cur.fetchall()
 
-        jobs_list = [x[0] for x in jobs]
+            # Query DB for jobs that match destinations in the dest_list:
+            query = """SELECT sum(c000) 
+                       FROM {}.{} 
+                       WHERE geoid10 IN %s;"""
+            cur.execute(query.format(SCHEMA, JOBS), (dest_tup,))
+            jobs = cur.fetchone()
+            access = jobs[0] + access_prev
 
-        access = sum(jobs_list)
 
-        entry = {'label': origin, 'deptime': deptime, '{}'.format(threshold_type): thresh, 'jobs': access}
-        writer.writerow(entry)
+            entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): thresh, 'jobs': access}
+            writer.writerow(entry)
+            access_prev = access
+        else:
+            entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): thresh, 'jobs': 0}
+            writer.writerow(entry)
 
 #################################
 #           OPERATIONS          #
@@ -266,11 +270,11 @@ if __name__ == '__main__':
     parser.add_argument('-table1', '--TABLE1_NAME', required=True, default=None)  #Table 1 in schema, i.e. o2pnr
     parser.add_argument('-table2', '--TABLE2_NAME', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
-    parser.add_argument('-or', '--ORIGIN_LIST', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
-    parser.add_argument('-pnr', '--PNR_LIST', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
-    parser.add_argument('-dep', '--DEPTIME_LIST', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
-    parser.add_argument('-dest', '--DESTINATION_LIST', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-lim', '--CALC_LIMIT', required=True, default=32400)  #Calculation cutoff, i.e. 32400 = 9:00 AM
+    parser.add_argument('-or', '--ORIGIN_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
+    parser.add_argument('-pnr', '--PNR_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
+    parser.add_argument('-dep', '--DEPTIME_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
+    parser.add_argument('-dest', '--DESTINATION_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
     #Optional until monetary cost is fixed
     parser.add_argument('-cost', '--PATH_COST_TABLE_NAME', required=False, default=None)  #Table auto_path_cost
     parser.add_argument('-scen', '--SCENARIO', required=False, default=None)  #Cost scenario to calc access from, i.e. fuel_cost, A, irs_cost
@@ -309,21 +313,21 @@ if __name__ == '__main__':
     writer_time = mod.mkDictOutput('Linked_wTTAccess_{}'.format(curtime), fieldname_list=fieldnames)
 
     #Calculate constants
-    #originList, pnrList, deptimeList, destination_list = makeLists()
-    originList = mod.readList(args.ORIGIN_LIST)
-    pnrList = mod.readList(args.PNR_LIST)
-    deptimeList = mod.readList(args.DEPTIME_LIST)
-    destination_list = mod.readList(args.DESTINATION_LIST)
+    originList, pnrList, deptimeList, destination_list = makeLists()
+    # originList = mod.readList(args.ORIGIN_LIST)
+    # pnrList = mod.readList(args.PNR_LIST)
+    # deptimeList = mod.readList(args.DEPTIME_LIST)
+    # destination_list = mod.readList(args.DESTINATION_LIST)
 
-    DEPTIME_SEC_LIST = [mod.convert2Sec(i) for i in deptimeList]
-
+    # DEPTIME_SEC_LIST = [mod.convert2Sec(i) for i in deptimeList]
 
     DEP2_SEC_DICT = deptime2SecDict()
-    dest_num = len(destination_list)
+    DEST_NUM = len(destination_list)
     #Make threshold list to check travel times against.
     THRESHOLD_LIST = [300, 600, 900, 1200, 1500, 1800, 2100, 2400, 2700, 3000, 3300, 3600, 3900, 4200,
                       4500, 4800, 5100, 5400]
-    THRESHOLD_LIST_MINUTE = [x/60 for x in THRESHOLD_LIST]
+
+    THRESHOLD_LIST_MINUTE = [int(x/60) for x in THRESHOLD_LIST]
 
     THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
 
@@ -334,73 +338,61 @@ if __name__ == '__main__':
     for origin in originList:
 
         for deptime in deptimeList:
-            # Initiate prevailing minimum travel time list to destination set.
-            destTTPrev = []
-            signal = 0
+            # Initiate travel time list to destination set, start with max time then update with min.
+            destTTPrev = array([2147483647] * DEST_NUM)
+
             #Iteratively update destTTPrev with minimum travel times.
             for pnr in pnrList:
 
+                #KRISTIN: CHECK HOW THE O2PNR TT MATRIX WAS CREATED, IF ALL BATCH-ANALYST.MX WAS USED THEN ALL PNRS
+                #CAN BE REACHED AND THERE MAY NOT BE A REASON FOR IF ORTT IS NOT NONE, MIGHT BE AN AFTIFACT OF MINI NETWORK
                 orTT = matchOrigin(origin, deptime, pnr)
 
-                #If origin cannot reach the chosen PNR in 30 minutes, pick a new PNR
+                #If origin cannot reach the chosen PNR in 90 minutes, pick a new PNR
                 if orTT is not None:
-                    depsum = DEP2_SEC_DICT[deptime] + orTT
+                    depsum = deptime + orTT
 
                     # If depsum is past the calculation window (9:00 AM), do not link paths.
                     if depsum < LIMIT:
 
                         # Choose dest_deptime based on closest 15 min bin.
-                        depsumBin= linkBins(depsum)
-                        destDeptime = mod.back2Time(depsumBin)
+                        depsumBin = linkBins(depsum, deptimeList)
+                        if depsumBin != LIMIT:
 
-                        #Time from origin and transfer (int)  = originTT (int) + transfer (int)
-                        orTT_trans = orTT + (depsumBin - depsum)
+                            #Time from origin and transfer (int)  = originTT (int) + transfer (int)
+                            orTT_trans = orTT + (depsumBin - depsum)
 
+                            #Create a numpy array that contains the total tt for each destination
+                            total_tt_list = array([dest_tt + orTT_trans for dest_tt in PNR2D15[pnr][depsumBin]])
 
-                        total_tt_generator = [dest_tt + orTT_trans for dest_tt in PNR2D15[pnr][destDeptime]]
+                            bestTT = minimum(destTTPrev, total_tt_list)
 
-                        # Check if destTTPrev is filled, signal variable used to due to generator function
-                        if signal > 0:
-
-                            #bestTT = minimum(destTTPrev, total_tt_generator)
-                            bestTT = [min(pair) for pair in zip(destTTPrev, total_tt_generator)]
-
-                            #Alternative for tuples:
-                            #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, destTTList)]
+                                #Alternative for tuples:
+                                #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, destTTList)]
 
                             destTTPrev = bestTT
-                        # On first pass, initialize the destination-TT array and other values.
-                        else:
-                            destTTPrev = total_tt_generator
-                            signal = 1
 
 
             #Before you write an entry, calculate access by connecting jobs to destinations
             #Make one query to jobs db per threshold:
-            # Create a new dict structure for the origin_deptime combo
-
-            THRESH_DICT = defaultdict(list)
-            COST_DICT = defaultdict(list)
+            # Create a new ordered dict structure for the origin_deptime combo
+            thresh_dict = OrderedDict()
+            for x in THRESHOLD_LIST_MINUTE:
+                thresh_dict[x] = []
+            #COST_DICT = defaultdict(list)
             #Iterate through the destinations and their respective TTs.
             for dest, totalTT in zip(destination_list, destTTPrev):
                 #moneyBuckets(origin, deptime, dest, tup)
-
                 #Only assign jobs where destination can be reached
                 if totalTT < 2147483647:
-                    filterTT(dest, totalTT)
-
-
-            #This ensures that each origin has all thresholds listed even if no jobs can be reached in the given time frame
-            for thresh in THRESHOLD_LIST:
-                if thresh not in THRESH_DICT:
-                    THRESH_DICT[thresh].append(0)
+                    thresh_dict = filterTT(thresh_dict, dest, totalTT)
 
             #writeAccessFile(origin, deptime, COST_DICT, 'cost', writer_cost)
-            writeAccessFile(origin, deptime, THRESH_DICT, 'threshold', writer_time)
+            writeAccessFile(origin, deptime, thresh_dict, 'threshold', writer_time)
 
 
 
         print('Origin {} finished'.format(origin), time.time() - t0)
 
-    readable_end = time.ctime(curtime)
+    readable_end = time.ctime(time.time() - t0)
     print(readable_end)
