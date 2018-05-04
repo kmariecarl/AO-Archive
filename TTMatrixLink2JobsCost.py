@@ -26,7 +26,7 @@ import argparse
 import psycopg2
 from collections import defaultdict, OrderedDict
 import time
-from numpy import minimum, array
+from numpy import minimum, array, fromiter
 
 #################################
 #           FUNCTIONS           #
@@ -36,24 +36,24 @@ from numpy import minimum, array
 def makeLists():
     print('Making input lists')
     #Faster way to select unique list of PNRs, deptimes, Destinations
-    cur.execute("SELECT {}.{}.origin FROM {}.{} GROUP BY origin;".format(SCHEMA,TABLE1, SCHEMA, TABLE1))
+    cur.execute("SELECT {}.{}.origin FROM {}.{} GROUP BY origin ORDER BY origin ASC;".format(SCHEMA,TABLE1, SCHEMA, TABLE1))
     origins = cur.fetchall()
-    origin_list = [str(x[0]) for x in origins]
+    origin_list = [x[0] for x in origins]
     print('Origin list created', time.time() - t0)
 
-    cur.execute("SELECT {}.{}.destination FROM {}.{} GROUP BY destination;".format(SCHEMA, TABLE1, SCHEMA, TABLE1))
+    cur.execute("SELECT {}.{}.destination FROM {}.{} GROUP BY destination ORDER BY destination ASC;".format(SCHEMA, TABLE1, SCHEMA, TABLE1))
     pnrs = cur.fetchall()
-    pnr_list = [str(x[0]) for x in pnrs]
+    pnr_list = [x[0] for x in pnrs]
     print('PNR list created', time.time() - t0)
 
     cur.execute("SELECT {}.{}.deptime_sec FROM {}.{} GROUP BY deptime_sec ORDER BY deptime_sec;".format(SCHEMA,TABLE1, SCHEMA,TABLE1))
     or_dep = cur.fetchall()
-    or_dep_list = [int(x[0]) for x in or_dep]
+    or_dep_list = [x[0] for x in or_dep]
     print('Deptime list created', time.time() - t0)
 
     cur.execute("SELECT {}.{}.destination FROM {}.{} GROUP BY destination ORDER BY destination ASC;".format(SCHEMA,TABLE2, SCHEMA,TABLE2))
     dest = cur.fetchall()
-    dest_list = [str(x[0]) for x in dest]
+    dest_list = [x[0] for x in dest]
     print('Destination list created', time.time() - t0)
 
     return origin_list, pnr_list, or_dep_list, dest_list
@@ -89,16 +89,34 @@ def createPNR2D15(pnr_list, deptime_list):
                            FROM {}.{}
                            WHERE origin = %s AND deptime_sec = %s
                            ORDER BY destination ASC"""
+
             cur.execute(query.format(SCHEMA, TABLE2), (pnr, deptime))  # next_bin,
 
             tt = cur.fetchall()  # Listed by ordered destination
 
-            tt_array = array([dest_tt[0] for dest_tt in tt])
+
+            tt_list = [dest_tt[0] for dest_tt in tt]
+            tt_array = array(tt_list)
 
             pnr2d15[pnr][deptime] = tt_array
         print('PNR {} has been added to PNR2d15 dictionary'.format(pnr))
         mod.elapsedTime(start_time)
     return pnr2d15
+
+def createJobsDict():
+    print('Building Jobs Dict', time.time() - t0)
+    jobs_dict = {}
+    query = """SELECT geoid10, c000 
+               FROM {}.{};"""
+    cur.execute(query.format(SCHEMA, JOBS))
+    jobs = cur.fetchall()
+    for tup in jobs:
+        jobs_dict[tup[0]] = tup[1]
+
+    print('Jobs Dict Now in Memory', time.time() - t0)
+    return jobs_dict
+
+
 
 
 #Query the o2pnr matrix for matching origin, deptime_sec, pnr combo
@@ -206,21 +224,31 @@ def linkBins(depsum, deptime_list):
 #Place the current row's destination into threshold bins based on its travel time
 #If destination cannot be reached, then do not include in output.
 #Output is an ordered dictionary mapping threshold to list of GEOIDs that can be reached
-def filterTT(thresh_dict, destination, tt):
-    signal = 0
-    # OTP puts TT in minutes then rounds down, the int() func. always rounds down.
-    # Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
-    minbin = tt / 60
-    #Place destination into only the first threshold that allows that destination to be reached
-    while signal == 0:
-        for thresh in THRESHOLD_LIST_MINUTE:
+def calcAccess(destination_list, destTTPrev):
+    # Before you write an entry, calculate access by connecting jobs to destinations
+    # Make one query to jobs db per threshold:
+    # Create a new ordered dict structure for the origin_deptime combo
+    thresh_dict = OrderedDict()
+    for x in THRESHOLD_LIST_MINUTE:
+        thresh_dict[x] = []
 
-            if minbin < thresh:
-                thresh_dict[thresh].append(destination)
-                signal = 1
+    # Iterate through the destinations and their respective TTs.
+    for dest, totalTT in zip(destination_list, destTTPrev):
+        # moneyBuckets(origin, deptime, dest, tup)
+        # Only assign jobs where destination can be reached
+        if totalTT < 2147483647:
+            # OTP puts TT in minutes then rounds down, the int() func. always rounds down.
+            # Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
+            minbin = totalTT / 60
+            for thresh in THRESHOLD_LIST_MINUTE:
+                # Place destination into only the first threshold that allows that destination to be reached
+                if minbin <= thresh:
+                    thresh_dict[thresh].append(dest)
+                    break
 
-    return thresh_dict
 
+    # writeAccessFile(origin, deptime, COST_DICT, 'cost', writer_cost)
+    writeAccessFile(origin, deptime, thresh_dict, 'threshold', writer_time)
 
 #This function evaluates the threshold dictionary provided and returns the jobs that match with the given destination list
 #then write to the provided writer file.
@@ -229,27 +257,36 @@ def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
     access_prev = 0
     #Each destination list only contains the new destinations that can be reached at each successive threshold.
     for thresh, dest_list in threshold_dict.items():
+        thresh_level_access = 0
         if len(dest_list) > 0:
+            #access = 0
 
             # Destination , list actually needs to be a tuple to work with the WHERE IN query below
-            dest_tup = tuple(dest_list)
+            #dest_tup = tuple(dest_list)
 
 
-            # Query DB for jobs that match destinations in the dest_list:
-            query = """SELECT sum(c000) 
-                       FROM {}.{} 
-                       WHERE geoid10 IN %s;"""
-            cur.execute(query.format(SCHEMA, JOBS), (dest_tup,))
-            jobs = cur.fetchone()
-            access = jobs[0] + access_prev
+            # # Query DB for jobs that match destinations in the dest_list:
+            # query = """SELECT sum(c000)
+            #            FROM {}.{}
+            #            WHERE geoid10 IN %s;"""
+            # print('cur execute', time.time() - t0)
+            # cur.execute(query.format(SCHEMA, JOBS), (dest_tup,))
+            # jobs = cur.fetchone()
+            # print('sum fetched', time.time() - t0)
+            for geoid in dest_list:
+                thresh_level_access += JOBS[geoid]
+
+            access = thresh_level_access + access_prev
 
 
-            entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): thresh, 'jobs': access}
+            entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): thresh * 60, 'jobs': access}
             writer.writerow(entry)
             access_prev = access
         else:
-            entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): thresh, 'jobs': 0}
+            access = access_prev
+            entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): thresh * 60, 'jobs': access }
             writer.writerow(entry)
+
 
 #################################
 #           OPERATIONS          #
@@ -314,10 +351,10 @@ if __name__ == '__main__':
 
     #Calculate constants
     originList, pnrList, deptimeList, destination_list = makeLists()
-    # originList = mod.readList(args.ORIGIN_LIST)
-    # pnrList = mod.readList(args.PNR_LIST)
-    # deptimeList = mod.readList(args.DEPTIME_LIST)
-    # destination_list = mod.readList(args.DESTINATION_LIST)
+    # originList = mod.readList(args.ORIGIN_LIST, str)
+    # pnrList = mod.readList(args.PNR_LIST, str)
+    # deptimeList = mod.readList(args.DEPTIME_LIST, int)
+    # destination_list = mod.readList(args.DESTINATION_LIST, str)
 
     # DEPTIME_SEC_LIST = [mod.convert2Sec(i) for i in deptimeList]
 
@@ -331,8 +368,10 @@ if __name__ == '__main__':
 
     THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
 
-    #Create pnr2d15 dict in memory
+    # Create pnr2d15 dict in memory
     PNR2D15 = createPNR2D15(pnrList, deptimeList)
+    #Make jobs dict in memory
+    JOBS = createJobsDict()
 
 
     for origin in originList:
@@ -347,6 +386,7 @@ if __name__ == '__main__':
                 #KRISTIN: CHECK HOW THE O2PNR TT MATRIX WAS CREATED, IF ALL BATCH-ANALYST.MX WAS USED THEN ALL PNRS
                 #CAN BE REACHED AND THERE MAY NOT BE A REASON FOR IF ORTT IS NOT NONE, MIGHT BE AN AFTIFACT OF MINI NETWORK
                 orTT = matchOrigin(origin, deptime, pnr)
+
 
                 #If origin cannot reach the chosen PNR in 90 minutes, pick a new PNR
                 if orTT is not None:
@@ -363,33 +403,18 @@ if __name__ == '__main__':
                             orTT_trans = orTT + (depsumBin - depsum)
 
                             #Create a numpy array that contains the total tt for each destination
-                            total_tt_list = array([dest_tt + orTT_trans for dest_tt in PNR2D15[pnr][depsumBin]])
+                            total_tt_array = PNR2D15[pnr][depsumBin] + orTT_trans
 
-                            bestTT = minimum(destTTPrev, total_tt_list)
+
+                            bestTT = minimum(destTTPrev, total_tt_array)
+
 
                                 #Alternative for tuples:
                                 #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, destTTList)]
 
                             destTTPrev = bestTT
 
-
-            #Before you write an entry, calculate access by connecting jobs to destinations
-            #Make one query to jobs db per threshold:
-            # Create a new ordered dict structure for the origin_deptime combo
-            thresh_dict = OrderedDict()
-            for x in THRESHOLD_LIST_MINUTE:
-                thresh_dict[x] = []
-            #COST_DICT = defaultdict(list)
-            #Iterate through the destinations and their respective TTs.
-            for dest, totalTT in zip(destination_list, destTTPrev):
-                #moneyBuckets(origin, deptime, dest, tup)
-                #Only assign jobs where destination can be reached
-                if totalTT < 2147483647:
-                    thresh_dict = filterTT(thresh_dict, dest, totalTT)
-
-            #writeAccessFile(origin, deptime, COST_DICT, 'cost', writer_cost)
-            writeAccessFile(origin, deptime, thresh_dict, 'threshold', writer_time)
-
+            calcAccess(destination_list, destTTPrev)
 
 
         print('Origin {} finished'.format(origin), time.time() - t0)
