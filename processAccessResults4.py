@@ -73,7 +73,7 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict):
             # Obtain the weighted accessibility values for the baseline and changed files
             base_access_wt = calcWeightedAccess(label, label_list, thrshld_list, base_dict)
             chg_access_wt = calcWeightedAccess(label, label_list, thrshld_list, change_dict)
-            # Calculate the raw and percent change between the WEIGHTED accessibility values
+            # Calculate the raw (as in the abs difference) and percent change between the WEIGHTED accessibility values
             column['wt_raw_chg'], column['wt_pct_chg'] = rawPctWeightAccess(label, base_access_wt, chg_access_wt)
             # Iteratively make names for columns
             name1 = 'rwdf{}'.format(thrshld)
