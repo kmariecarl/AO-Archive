@@ -17,6 +17,7 @@
 from myToolsPackage import matrixLinkModule as mod
 import argparse
 import time
+from myToolsPackage.progress import bar
 import csv
 
 #################################
@@ -63,7 +64,7 @@ def calcLinkCost(length_mi, cost_mile):
 
 def removeSciNot(value):
     reformat = '{:.10f}'.format(value)
-    return reformat
+    return float(reformat)
 
 
 def calcRepairCost(row, speedMPH, length_mi):
@@ -94,6 +95,7 @@ def calcVOTCost(link_time_sec):
     return vot_cost
 
 
+
 #################################
 #           OPERATIONS          #
 #################################
@@ -103,6 +105,9 @@ if __name__ == '__main__':
     start_time, curtime = mod.startTimer()
     readable = time.ctime(start_time)
     print(readable)
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=5405836718) #Max is the number of rows for a 428 GB file
+
+
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
@@ -147,11 +152,15 @@ if __name__ == '__main__':
 
 
         #Write entry, remember that the written price per link is in cents
-        entry = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'], 'path_seq': row['path_seq'], 'fuel_cost': fuelCost,
-                 'repair_cost': repairCost, 'depreciation_cost': depCost, 'irs_cost': irsCost, 'vot_cost': votCost}
+        entry = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'], 'path_seq': row['path_seq'], 'fuel_cost': round(fuelCost, 3),
+                 'repair_cost': round(repairCost, 3), 'depreciation_cost': round(depCost, 3), 'irs_cost': round(irsCost, 3), 'vot_cost': round(votCost, 3)}
         writer.writerow(entry)
+        bar.next()
+
+    bar.finish()
     print('Link cost analysis finished')
     mod.elapsedTime(start_time)
+
 
 
 
