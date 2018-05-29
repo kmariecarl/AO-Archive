@@ -1,0 +1,1 @@
+﻿COPY ttmatrices.path_cost FROM '/Volumes/Thang_2/Task3_Extension/TwinCities_PathAnalysis/Path_Cost_Matrix_20180527103337.txt' CSV HEADER DELIMITER ',';
