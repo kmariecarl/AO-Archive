@@ -14,6 +14,7 @@
 from myToolsPackage import matrixLinkModule as mod
 import argparse
 import time
+from myToolsPackage.progress import bar
 
 #################################
 #           FUNCTIONS           #
@@ -28,6 +29,7 @@ if __name__ == '__main__':
     start_time, curtime = mod.startTimer()
     readable = time.ctime(start_time)
     print(readable)
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=5405836718)
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
@@ -46,7 +48,7 @@ if __name__ == '__main__':
     reader = mod.readInToDict(args.LINK_COST_FILE)
     #Initiate writer file
     fieldnames = ['origin', 'deptime', 'destination', 'fuel_cost', 'repair_cost', 'depreciation_cost', 'irs_cost',
-                  'vot_cost', 'fix_cost', 'A', 'B', 'C', 'D', 'E', 'F', 'G']
+                  'vot_cost', 'fix_cost', 'A', 'B', 'C', 'D', 'E']
     writer = mod.mkDictOutput('Path_Cost_Matrix_{}'.format(curtime), fieldname_list=fieldnames)
     #Initiate variables
     FIXED = float(args.TIME_DEP_FEE_FIXED_COST)
@@ -61,20 +63,22 @@ if __name__ == '__main__':
     suma = 0
     sumb = 0
     sumc = 0
+    sumd = 0
+    sume = 0
 
     previous = {}
 
     for row in reader:
         current = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'],
                    'fuel_cost': sumfuel, 'repair_cost': sumrep, 'depreciation_cost': sumdep, 'irs_cost': sumirs, 'vot_cost': sumvot,
-                   'fix_cost': FIXED, 'A': suma, 'B': sumb, 'C': sumc}
+                   'fix_cost': FIXED, 'A': suma, 'B': sumb, 'C': sumc, 'D': sumd, 'E': sume}
         #Scenario to handle the first OD pair
         if int(row['path_seq']) == 0 and count == 0:
-            sumfuel += float(row['fuel_cost'])
-            sumrep  += float(row['repair_cost'])
-            sumdep += float(row['depreciation_cost'])
-            sumirs += float(row['irs_cost'])
-            sumvot += float(row['vot_cost'])
+            sumfuel += round(float(row['fuel_cost']), 3)
+            sumrep  += round(float(row['repair_cost']), 3)
+            sumdep += round(float(row['depreciation_cost']), 3)
+            sumirs += round(float(row['irs_cost']), 3)
+            sumvot += round(float(row['vot_cost']), 3)
 
             previous = current
         #Row only written when a sequence has been finished
@@ -83,46 +87,54 @@ if __name__ == '__main__':
             suma = sumfuel + sumrep + sumdep + FIXED
             sumb = sumfuel + sumrep + sumdep + FIXED + sumvot
             sumc = sumirs
+            sumd = sumfuel + sumrep + sumdep
+            sume = sumfuel + sumrep + sumdep + sumvot
 
             #Update the previous row with the sums that were found for this run through.
-            previous['A'] = suma
-            previous['B'] = sumb
-            previous['C'] = sumc
+            previous['A'] = round(suma, 3)
+            previous['B'] = round(sumb, 3)
+            previous['C'] = round(sumc, 3)
+            previous['D'] = round(sumd, 3)
+            previous['E'] = round(sume, 3)
 
             writer.writerow(previous)
             #Reset sumlink to zero
             sumfuel = 0
-            sumfuel += float(row['fuel_cost'])
+            sumfuel += round(float(row['fuel_cost']), 3)
             sumrep = 0
-            sumrep  += float(row['repair_cost'])
+            sumrep  += round(float(row['repair_cost']), 3)
             sumdep = 0
-            sumdep += float(row['depreciation_cost'])
+            sumdep += round(float(row['depreciation_cost']), 3)
             sumirs = 0
-            sumirs += float(row['irs_cost'])
+            sumirs += round(float(row['irs_cost']), 3)
             sumvot = 0
-            sumvot += float(row['vot_cost'])
+            sumvot += round(float(row['vot_cost']), 3)
             previous = current
+
             #Update previous with the sumlink that was found for this run through.
-            previous['fuel_cost'] = sumfuel
-            previous['repair_cost'] = sumrep
-            previous['depreciation_cost'] = sumdep
-            previous['irs_cost'] = sumirs
-            previous['vot_cost'] = sumvot
+            previous['fuel_cost'] = round(sumfuel, 3)
+            previous['repair_cost'] = round(sumrep, 3)
+            previous['depreciation_cost'] = round(sumdep, 3)
+            previous['irs_cost'] = round(sumirs, 3)
+            previous['vot_cost'] = round(sumvot, 3)
+            bar.next()
         #Most times the Else clause will catch
         else:
-            sumfuel += float(row['fuel_cost'])
-            sumrep  += float(row['repair_cost'])
-            sumdep += float(row['depreciation_cost'])
-            sumirs += float(row['irs_cost'])
-            sumvot += float(row['vot_cost'])
+            sumfuel += round(float(row['fuel_cost']), 3)
+            sumrep  += round(float(row['repair_cost']), 3)
+            sumdep += round(float(row['depreciation_cost']), 3)
+            sumirs += round(float(row['irs_cost']), 3)
+            sumvot += round(float(row['vot_cost']), 3)
             previous = current
             #Update the previous row with the sumlink that was found for this run through.
-            previous['fuel_cost'] = sumfuel
-            previous['repair_cost'] = sumrep
-            previous['depreciation_cost'] = sumdep
-            previous['irs_cost'] = sumirs
-            previous['vot_cost'] = sumvot
+            previous['fuel_cost'] = round(sumfuel, 3)
+            previous['repair_cost'] = round(sumrep, 3)
+            previous['depreciation_cost'] = round(sumdep, 3)
+            previous['irs_cost'] = round(sumirs, 3)
+            previous['vot_cost'] = round(sumvot, 3)
+
         count += 1
+    bar.finish()
     mod.elapsedTime(start_time)
 
 
