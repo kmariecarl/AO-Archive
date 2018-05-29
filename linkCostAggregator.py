@@ -117,7 +117,7 @@ if __name__ == '__main__':
             previous['depreciation_cost'] = round(sumdep, 3)
             previous['irs_cost'] = round(sumirs, 3)
             previous['vot_cost'] = round(sumvot, 3)
-            bar.next()
+
         #Most times the Else clause will catch
         else:
             sumfuel += round(float(row['fuel_cost']), 3)
@@ -132,9 +132,11 @@ if __name__ == '__main__':
             previous['depreciation_cost'] = round(sumdep, 3)
             previous['irs_cost'] = round(sumirs, 3)
             previous['vot_cost'] = round(sumvot, 3)
+            bar.next()
 
         count += 1
     bar.finish()
+    print('Final row count=', count)
     mod.elapsedTime(start_time)
 
 
