@@ -123,11 +123,10 @@ def matchOrigin(origin, deptime, pnr, scenario):
     try:
         cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, pnr))
         c = cur.fetchall()
-        print('C=', c)
         value = round(float(c[0][0]), 2)
     except:
         print('Origin-PNR does not have a path cost', origin, pnr)
-        value = 0
+        value = 1000
 
     return int(tt[0][0]), value
 
@@ -165,7 +164,6 @@ def calcAccess(origin, deptime, destination_list, destTTPrev, writer_time, write
 
     for y in THRESHOLD_COST_LIST:
         cost_dict[y] = []
-    print("Start cost_dict", cost_dict)
 
     # Iterate through the destinations and their respective TTs.
     for dest, totalTT_tup in zip(destination_list, destTTPrev):
@@ -180,7 +178,7 @@ def calcAccess(origin, deptime, destination_list, destTTPrev, writer_time, write
             a_t_cost = totalTT_tup[1] + int(FARE)
             for cost in THRESHOLD_COST_LIST:
                 if a_t_cost <= cost:
-                    print('a_t_cost, cost', a_t_cost, cost)
+
                     cost_dict[cost].append(dest)
                     break
 
@@ -191,7 +189,7 @@ def assign2Thresh(minbin, thresh_dict, dest):
     for thresh in THRESHOLD_LIST_MINUTE:
         # Place destination into only the first threshold that allows that destination to be reached
         if minbin <= thresh:
-            print('minbin, thresh', minbin, thresh)
+
             thresh_dict[thresh].append(dest)
     return thresh_dict
 
