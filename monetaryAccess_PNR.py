@@ -4,6 +4,8 @@
 #Notes:
 #All costs listed in cents. ie. $4.00 listed as 400
 
+#Not all origins can be associated with all PNRs for a COST due to limits on path analysis file size.
+
 
 #################################
 #           IMPORTS             #
@@ -109,7 +111,7 @@ def createJobsDict():
 
 
 #Query the o2pnr matrix for matching origin, deptime_sec, pnr combo
-def matchOrigin(origin, deptime, pnr, scenario):
+def matchOrigin(origin, deptime, pnr, scenario, null_counter):
     query = """SELECT traveltime
                FROM {}.{}
                WHERE origin = %s AND deptime_sec = %s AND destination = %s;"""
@@ -118,17 +120,19 @@ def matchOrigin(origin, deptime, pnr, scenario):
 
     query2 = """SELECT {}
                FROM {}.{}
-               WHERE origin = %s AND destination = %s;""" #deptime_sec = %s
-    #Temp remove dependency on deptime for unittesting purposes
+               WHERE origin = %s AND deptime_sec = %s AND destination = %s;"""
+
+    #In many cases an origin may have a tt but not a cost for the selected PNR, if the tt to that PNR is greater than 40 minutes
+    #which is what was calculated by the path analyst program.
     try:
-        cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, pnr))
+        cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, deptime, pnr))
         c = cur.fetchall()
         value = round(float(c[0][0]), 2)
     except:
-        print('Origin-PNR does not have a path cost', origin, pnr)
+        null_counter += 1
         value = 1000
 
-    return int(tt[0][0]), value
+    return int(tt[0][0]), value, null_counter
 
 #Place depsum values into a 15 minute bin. Ex. 6:05 will get placed in the 6:15 bin.
 #Bins are rounded up to allow for transfer time between origin egress to destination ingress
@@ -299,6 +303,7 @@ if __name__ == '__main__':
     DEP2_SEC_DICT = deptime2SecDict()
     DEST_NUM = len(destination_list)
     print('Dest Num=', DEST_NUM)
+    nullCounter = 0
     #Make threshold list to check travel times against.
     THRESHOLD_LIST = [300, 600, 900, 1200, 1500, 1800, 2100, 2400, 2700, 3000, 3300, 3600, 3900, 4200,
                       4500, 4800, 5100, 5400]
@@ -326,7 +331,7 @@ if __name__ == '__main__':
             for pnr in pnrList:
 
                 #Return origin TT and the automobile cost
-                orTT, a_cost = matchOrigin(origin, deptime, pnr, SCENARIO)
+                orTT, a_cost, nullCounter = matchOrigin(origin, deptime, pnr, SCENARIO, nullCounter)
 
                 #If origin cannot reach the chosen PNR in 90 minutes, pick a new PNR
                 if orTT is not None:
@@ -362,5 +367,6 @@ if __name__ == '__main__':
         print('Origin {} finished'.format(origin), time.time() - t0)
 
     bar.finish()
+    print('{} origin-deptime combos did not have an assigned auto cost due to path analysis file size limitations'.format(nullCounter/114))
     readable_end = time.ctime(time.time() - t0)
     print(readable_end)
