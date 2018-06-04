@@ -16,6 +16,7 @@ import argparse
 import psycopg2
 from collections import defaultdict, OrderedDict
 import time
+import numpy as np
 from myToolsPackage.progress import bar
 
 #################################
@@ -84,12 +85,12 @@ def createPNR2D15(pnr_list, deptime_list):
 
             tt = cur.fetchall()  # Listed by ordered destination
 
+            #Create a list of lists [tt, cost] then transform to numpy array
+            tt_list = [[dest_tt[0], 10000] for dest_tt in tt]
 
-            tt_list = [dest_tt[0] for dest_tt in tt]
-            #Remove numpy functionality
-            #tt_array = array(tt_list)
+            tt_array = np.array(tt_list)
 
-            pnr2d15[pnr][deptime] = tt_list #tt_array
+            pnr2d15[pnr][deptime] = tt_array
         print('PNR {} has been added to PNR2d15 dictionary'.format(pnr))
         mod.elapsedTime(start_time)
     return pnr2d15
@@ -128,9 +129,10 @@ def matchOrigin(origin, deptime, pnr, scenario, null_counter):
         cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, deptime, pnr))
         c = cur.fetchall()
         value = round(float(c[0][0]), 2)
+
     except:
         null_counter += 1
-        value = 1000
+        value = 10000  #=$100.00
 
     return int(tt[0][0]), value, null_counter
 
@@ -157,17 +159,70 @@ def linkBins(depsum, deptime_list):
 #Place the current row's destination into threshold bins based on its travel time
 #If destination cannot be reached, then do not include in output.
 #Output is an ordered dictionary mapping threshold to list of GEOIDs that can be reached
-def calcAccess(origin, deptime, destination_list, destTTPrev, writer_time, writer_cost):
-    # Before you write an entry, calculate access by connecting jobs to destinations
-    # Make one query to jobs db per threshold:
-    # Create a new ordered dict structure for the origin_deptime combo
+# def calcAccess(origin, deptime, destination_list, destTTPrev, writer_time, writer_cost):
+#     # Before you write an entry, calculate access by connecting jobs to destinations
+#     # Make one query to jobs db per threshold:
+#     # Create a new ordered dict structure for the origin_deptime combo
+#     thresh_dict = OrderedDict()
+#     cost_dict = OrderedDict()
+#     for x in THRESHOLD_LIST_MINUTE:
+#         thresh_dict[x] = []
+#
+#     for y in THRESHOLD_COST_LIST:
+#         cost_dict[y] = []
+#
+#     # Iterate through the destinations and their respective TTs.
+#     for dest, totalTT_tup in zip(destination_list, destTTPrev):
+#         # Only assign jobs where destination can be reached
+#         #totalTT_tup[0] is travel time, while tup[1] is auto cost
+#         if totalTT_tup[0] < 2147483647:
+#             # OTP puts TT in minutes then rounds down, the int() func. always rounds down.
+#             # Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
+#             minbin = totalTT_tup[0] / 60
+#             print('minbin',  minbin)
+#             print('time7', time.time() - t0)
+#             thresh_dict = assign2Thresh(minbin, thresh_dict, dest)
+#             print('Thresh dict', thresh_dict)
+#             print('time8', time.time() - t0)
+#
+#
+#             a_t_cost = totalTT_tup[1] + int(FARE)
+#             print('a_t_cost', a_t_cost)
+#             cost_dict = assign2Cost(a_t_cost, cost_dict, dest)
+#             print('Cost dict', cost_dict)
+#             print('time9', time.time() - t0)
+#
+#     writeAccessFile(origin, deptime, thresh_dict, 'threshold', writer_time)
+#     writeAccessFile(origin, deptime, cost_dict, 'cost', writer_cost)
+#
+#
+# def assign2Thresh(minbin, thresh_dict, dest):
+#     for thresh in THRESHOLD_LIST_MINUTE:
+#         # Place destination into only the first threshold that allows that destination to be reached
+#         if minbin <= thresh:
+#
+#             thresh_dict[thresh].append(dest)
+#
+#             return thresh_dict
+#
+#
+# def assign2Cost(a_t_cost, cost_dict, dest):
+#     for cost in THRESHOLD_COST_LIST:
+#         # Place destination into only the first cost threshold that allows that destination to be reached
+#         if a_t_cost <= cost:
+#
+#             cost_dict[cost].append(dest)
+#             return cost_dict
+
+#Place the current row's destination into threshold bins based on its travel time
+#If destination cannot be reached, then do not include in output.
+#Output is an ordered dictionary mapping threshold to list of GEOIDs that can be reached
+def calcTimeAccess(origin, deptime, destination_list, destTTPrev, writer_time):
+    #print('time7', time.time() - t0)
     thresh_dict = OrderedDict()
-    cost_dict = OrderedDict()
+
     for x in THRESHOLD_LIST_MINUTE:
         thresh_dict[x] = []
-
-    for y in THRESHOLD_COST_LIST:
-        cost_dict[y] = []
 
     # Iterate through the destinations and their respective TTs.
     for dest, totalTT_tup in zip(destination_list, destTTPrev):
@@ -177,33 +232,57 @@ def calcAccess(origin, deptime, destination_list, destTTPrev, writer_time, write
             # OTP puts TT in minutes then rounds down, the int() func. always rounds down.
             # Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
             minbin = totalTT_tup[0] / 60
-            thresh_dict = assign2Thresh(minbin, thresh_dict, dest)
+
+
+
+            for thresh in THRESHOLD_LIST_MINUTE:
+                # Place destination into only the first threshold that allows that destination to be reached
+                if minbin <= thresh:
+                    thresh_dict[thresh].append(dest)
+                    break
+
+
+    writeAccessFile(origin, deptime, thresh_dict, 'threshold', writer_time)
+
+def calcMonetaryAccess(origin, deptime, destination_list, destTTPrev, writer_cost):
+    #print('time8', time.time() - t0)
+    cost_dict = OrderedDict()
+
+    for y in THRESHOLD_COST_LIST:
+        cost_dict[y] = []
+
+    # Iterate through the destinations and their respective TTs.
+    for dest, totalTT_tup in zip(destination_list, destTTPrev):
+        # Only assign jobs where destination can be reached
+        #totalTT_tup[0] is travel time, while tup[1] is auto cost
+        if totalTT_tup[0] < 2147483647:
 
             a_t_cost = totalTT_tup[1] + int(FARE)
+
+
+
             for cost in THRESHOLD_COST_LIST:
+                # Place destination into only the first cost threshold that allows that destination to be reached
                 if a_t_cost <= cost:
 
                     cost_dict[cost].append(dest)
                     break
 
     writeAccessFile(origin, deptime, cost_dict, 'cost', writer_cost)
-    writeAccessFile(origin, deptime, thresh_dict, 'threshold', writer_time)
 
-def assign2Thresh(minbin, thresh_dict, dest):
-    for thresh in THRESHOLD_LIST_MINUTE:
-        # Place destination into only the first threshold that allows that destination to be reached
-        if minbin <= thresh:
 
-            thresh_dict[thresh].append(dest)
-    return thresh_dict
+
 
 #This function evaluates the threshold dictionary provided and returns the jobs that match with the given destination list
 #then write to the provided writer file.
 def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
+    #print('time9', time.time() - t0)
+
     #For each threshold, calculate accessibility
     access_prev = 0
     #Each destination list only contains the new destinations that can be reached at each successive threshold.
     for thresh, dest_list in threshold_dict.items():
+
         thresh_level_access = 0
 
         #Write the threshold out in different ways depending on time or cost
@@ -311,7 +390,9 @@ if __name__ == '__main__':
     THRESHOLD_LIST_MINUTE = [int(x/60) for x in THRESHOLD_LIST]
 
     #THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
-    THRESHOLD_COST_LIST = [350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900]
+    THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400]
+    #For Unit testing
+    #THRESHOLD_COST_LIST = [320, 330, 340, 350, 360, 370, 380, 390, 400 ]
 
     # Create pnr2d15 dict in memory
     PNR2D15 = createPNR2D15(pnrList, deptimeList)
@@ -329,9 +410,12 @@ if __name__ == '__main__':
 
             #Iteratively update destTTPrev with minimum travel times.
             for pnr in pnrList:
+                #print('time1', time.time() - t0)
 
                 #Return origin TT and the automobile cost
                 orTT, a_cost, nullCounter = matchOrigin(origin, deptime, pnr, SCENARIO, nullCounter)
+
+                #print('time2', time.time() - t0)
 
                 #If origin cannot reach the chosen PNR in 90 minutes, pick a new PNR
                 if orTT is not None:
@@ -345,28 +429,34 @@ if __name__ == '__main__':
                         if depsumBin != LIMIT:
 
                             #Time from origin and transfer (int)  = originTT (int) + transfer (int)
-                            orTT_trans = orTT + (depsumBin - depsum)
+                            orTT_trans = np.array([orTT + (depsumBin - depsum), a_cost])
 
                             #Create an array of tuples that contains the total tt for each destination and the auto cost
-
-                            total_tt_array = [(destTT + orTT_trans, a_cost) for destTT in PNR2D15[pnr][depsumBin]]
+                            #print('time3', time.time() - t0)
+                            total_tt_array = PNR2D15[pnr][depsumBin] + orTT_trans
+                            #total_tt_array = [(destTT + orTT_trans, a_cost) for destTT in PNR2D15[pnr][depsumBin]]
+                            #print('time4', time.time() - t0)
 
                             #In order to use the numpy minimum function, I cannot compare tuples :(
                             #bestTT = minimum(destTTPrev, total_tt_array)
 
-
+                            #print('time5', time.time() - t0)
                             #Alternative for tuples:
-                            bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, total_tt_array)]
+                            #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, total_tt_array)]
+                            #Alternative for numpy list of lists
+                            bestTT = np.minimum(destTTPrev, total_tt_array)
+                            #print('time6', time.time() - t0)
 
                             destTTPrev = bestTT
 
-            calcAccess(origin, deptime, destination_list, destTTPrev, writer_time, writer_cost)
-        bar.next()
-
+            calcTimeAccess(origin, deptime, destination_list, destTTPrev, writer_time)
+            calcMonetaryAccess(origin, deptime, destination_list, destTTPrev, writer_cost)
 
         print('Origin {} finished'.format(origin), time.time() - t0)
+        bar.next()
+        print(" ")
 
     bar.finish()
-    print('{} origin-deptime combos did not have an assigned auto cost due to path analysis file size limitations'.format(nullCounter/114))
+    print('{} origin-deptime-pnr combos did not have an assigned auto cost due to path analysis file size limitations'.format(nullCounter))
     readable_end = time.ctime(time.time() - t0)
     print(readable_end)
