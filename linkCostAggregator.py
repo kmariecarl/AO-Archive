@@ -66,9 +66,23 @@ if __name__ == '__main__':
     sumd = 0
     sume = 0
 
+    #Initiate counting lists
+    or_set = []
+    dep_set = []
+    dest_set = []
+
     previous = {}
 
     for row in reader:
+        #Due to missing data problems, need to count origins, deptimes, destinations
+        if row['origin'] not in or_set:
+            or_set.append(row['origin'])
+        if row['deptime'] not in dep_set:
+            dep_set.append(row['deptime'])
+        if row['destination'] not in dest_set:
+            dest_set.append(row['destination'])
+
+
         current = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'],
                    'fuel_cost': sumfuel, 'repair_cost': sumrep, 'depreciation_cost': sumdep, 'irs_cost': sumirs, 'vot_cost': sumvot,
                    'fix_cost': FIXED, 'A': suma, 'B': sumb, 'C': sumc, 'D': sumd, 'E': sume}
@@ -137,6 +151,9 @@ if __name__ == '__main__':
         count += 1
     bar.finish()
     print('Final row count=', count)
+    print("Number of origins visited:", len(or_set))
+    print("Number of deptimes:", len(dep_set))
+    print("Number of destinations visited:", len(dest_set))
     mod.elapsedTime(start_time)
 
 

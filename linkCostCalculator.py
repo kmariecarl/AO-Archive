@@ -105,14 +105,14 @@ if __name__ == '__main__':
     start_time, curtime = mod.startTimer()
     readable = time.ctime(start_time)
     print(readable)
-    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=5405836718) #Max is the number of rows for a 428 GB file
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=3600000000) #Max is the number of rows 5405836718 for a 428 GB file
 
 
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
     parser.add_argument('-path', '--PATH_FILE', required=True, default=None)  #ENTER AS full file path to path_analyst file
-    parser.add_argument('-mpg_adj', '--MPG_ADJUSTMENT', required=True, default=32400)  #Assume city driving adjustment of 0.8354
+    # parser.add_argument('-mpg_adj', '--MPG_ADJUSTMENT', required=True, default=32400)  #Assume city driving adjustment of 0.8354
     parser.add_argument('-price_per_gal', '--PRICE_PER_GALLON_REGULAR', required=True, default=233.5)  # $2.335 in MN in 2015, enter in cents (233.5 cents)
     parser.add_argument('-vot', '--VALUE_OF_TIME', required=True, default=1803.0)  # MnDOT research states $18.30 or 1803.0 cents
     parser.add_argument('-repaircity', '--REPAIR_COST_CITY', required=True, default=1.932) #Combined (auto + pickup) city Maintenance and Repair costs in cents per veh-mi for 2015
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Read in constants
-    ADJ = float(args.MPG_ADJUSTMENT)
+    # ADJ = float(args.MPG_ADJUSTMENT)
     PRICE = float(args.PRICE_PER_GALLON_REGULAR)
     VOT = float(args.VALUE_OF_TIME)
     REP_CITY = float(args.REPAIR_COST_CITY)
@@ -139,8 +139,22 @@ if __name__ == '__main__':
     fieldnames = ['origin', 'deptime', 'destination', 'path_seq', 'fuel_cost', 'repair_cost', 'depreciation_cost', 'irs_cost', 'vot_cost']
     writer = mod.mkDictOutput('link_costs_matrix_{}'.format(curtime), fieldname_list=fieldnames)
 
+    #Initiate counting lists
+    count = 0
+    or_set = []
+    dep_set = []
+    dest_set = []
 
     for row in reader:
+
+        #Due to missing data problems, need to count origins, deptimes, destinations
+        if row['origin'] not in or_set:
+            or_set.append(row['origin'])
+        if row['deptime'] not in dep_set:
+            dep_set.append(row['deptime'])
+        if row['destination'] not in dest_set:
+            dest_set.append(row['destination'])
+
         lengthMI = convertLinkLength(row['link_length']) #starts in km need miles
         speedMPH = convertLinkSpeed(row['link_speed']) #Starts in m need miles
         fuelCost = calcFuelCost(row, lengthMI, speedMPH) #Fuel price = f(speed) * price/gallon
@@ -156,8 +170,14 @@ if __name__ == '__main__':
                  'repair_cost': round(repairCost, 3), 'depreciation_cost': round(depCost, 3), 'irs_cost': round(irsCost, 3), 'vot_cost': round(votCost, 3)}
         writer.writerow(entry)
         bar.next()
+        count += 1
 
     bar.finish()
+    print('Final row count=', count)
+    print("Number of origins visited:", len(or_set))
+    print("Number of deptimes:", len(dep_set))
+    print("Number of destinations visited:", len(dest_set))
+
     print('Link cost analysis finished')
     mod.elapsedTime(start_time)
 
