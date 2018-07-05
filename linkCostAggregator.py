@@ -1,4 +1,5 @@
-#This script finds the total cost of a series of links between an OD pair based on the linkCostCalculator.py output
+#This script finds the total cost of a series of links between an OD pair based on the linkCostCalculator.py output.
+#This script also creates a travel time matrix from the path information
 
 #Need to add fixed costs and trip based parking costs and maybe mnpass costs to the path output, because these fixed costs
 #are trip based!!
@@ -29,7 +30,7 @@ if __name__ == '__main__':
     start_time, curtime = mod.startTimer()
     readable = time.ctime(start_time)
     print(readable)
-    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=5405836718)
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=261617092)
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
@@ -46,14 +47,21 @@ if __name__ == '__main__':
 
     #Read in link cost file
     reader = mod.readInToDict(args.LINK_COST_FILE)
-    #Initiate writer file
-    fieldnames = ['origin', 'deptime', 'destination', 'fuel_cost', 'repair_cost', 'depreciation_cost', 'irs_cost',
-                  'vot_cost', 'fix_cost', 'A', 'B', 'C', 'D', 'E']
-    writer = mod.mkDictOutput('Path_Cost_Matrix_{}'.format(curtime), fieldname_list=fieldnames)
+    #Initiate Path Cost writer file
+    fieldnames_cost = ['origin', 'deptime', 'destination', 'traveltime','fuel_cost', 'repair_cost', 'depreciation_cost', 'irs_cost',
+                  'vot_cost', 'fix_cost', 'A', 'B', 'C', 'D', 'E', 'deptime_sec']
+    writer_cost = mod.mkDictOutput('Path_Cost_Matrix_{}'.format(curtime), fieldname_list=fieldnames_cost)
+
+    #Initiate Travel Time writer file
+    fieldnames_time = ['origin', 'destination', 'deptime', 'traveltime', 'deptime_sec']
+    writer_time = mod.mkDictOutput('Path_TT_Matrix_{}'.format(curtime), fieldname_list=fieldnames_time)
+
+
     #Initiate variables
     FIXED = float(args.TIME_DEP_FEE_FIXED_COST)
 
     count = 0
+    sumtime = 0
     sumfuel = 0
     sumrep = 0
     sumdep = 0
@@ -72,6 +80,7 @@ if __name__ == '__main__':
     dest_set = []
 
     previous = {}
+    previous_time = {}
 
     for row in reader:
         #Due to missing data problems, need to count origins, deptimes, destinations
@@ -83,18 +92,22 @@ if __name__ == '__main__':
             dest_set.append(row['destination'])
 
 
-        current = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'],
+        current_cost = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'], 'traveltime': sumtime,
                    'fuel_cost': sumfuel, 'repair_cost': sumrep, 'depreciation_cost': sumdep, 'irs_cost': sumirs, 'vot_cost': sumvot,
-                   'fix_cost': FIXED, 'A': suma, 'B': sumb, 'C': sumc, 'D': sumd, 'E': sume}
+                   'fix_cost': FIXED, 'A': suma, 'B': sumb, 'C': sumc, 'D': sumd, 'E': sume, 'deptime_sec': mod.convert2Sec(row['deptime'])}
+
+        current_time = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'], 'traveltime': sumtime, 'deptime_sec': mod.convert2Sec(row['deptime'])}
         #Scenario to handle the first OD pair
         if int(row['path_seq']) == 0 and count == 0:
+            sumtime += round(float(row['link_time']), 3)
             sumfuel += round(float(row['fuel_cost']), 3)
             sumrep  += round(float(row['repair_cost']), 3)
             sumdep += round(float(row['depreciation_cost']), 3)
             sumirs += round(float(row['irs_cost']), 3)
             sumvot += round(float(row['vot_cost']), 3)
 
-            previous = current
+            previous = current_cost
+            previous_time = current_time
         #Row only written when a sequence has been finished
         elif int(row['path_seq']) == 0 and count != 0:
             #At the end of the iteration, add up the sums of each variable for the different scenarios
@@ -111,8 +124,13 @@ if __name__ == '__main__':
             previous['D'] = round(sumd, 3)
             previous['E'] = round(sume, 3)
 
-            writer.writerow(previous)
+            previous_time['traveltime'] = int(sumtime)
+
+            writer_cost.writerow(previous)
+            writer_time.writerow(previous_time)
             #Reset sumlink to zero
+            sumtime = 0
+            sumtime += round(float(row['link_time']), 3)
             sumfuel = 0
             sumfuel += round(float(row['fuel_cost']), 3)
             sumrep = 0
@@ -123,29 +141,38 @@ if __name__ == '__main__':
             sumirs += round(float(row['irs_cost']), 3)
             sumvot = 0
             sumvot += round(float(row['vot_cost']), 3)
-            previous = current
+            previous = current_cost
+            previous_time = current_time
 
             #Update previous with the sumlink that was found for this run through.
+            previous['traveltime'] = int(sumtime)
             previous['fuel_cost'] = round(sumfuel, 3)
             previous['repair_cost'] = round(sumrep, 3)
             previous['depreciation_cost'] = round(sumdep, 3)
             previous['irs_cost'] = round(sumirs, 3)
             previous['vot_cost'] = round(sumvot, 3)
 
+            previous_time['traveltime'] = int(sumtime)
         #Most times the Else clause will catch
         else:
+            sumtime += round(float(row['link_time']), 3)
             sumfuel += round(float(row['fuel_cost']), 3)
             sumrep  += round(float(row['repair_cost']), 3)
             sumdep += round(float(row['depreciation_cost']), 3)
             sumirs += round(float(row['irs_cost']), 3)
             sumvot += round(float(row['vot_cost']), 3)
-            previous = current
+            previous = current_cost
+            previous_time = current_time
             #Update the previous row with the sumlink that was found for this run through.
+            previous['traveltime'] = int(sumtime)
             previous['fuel_cost'] = round(sumfuel, 3)
             previous['repair_cost'] = round(sumrep, 3)
             previous['depreciation_cost'] = round(sumdep, 3)
             previous['irs_cost'] = round(sumirs, 3)
             previous['vot_cost'] = round(sumvot, 3)
+
+            previous_time['traveltime'] = int(sumtime)
+
             bar.next()
 
         count += 1
