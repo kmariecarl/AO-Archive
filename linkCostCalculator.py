@@ -1,5 +1,5 @@
 #This script reads in a path analyst file and calculates the cost per link given variables like average fuel price,
-#time cost, vehicle depreciation cost, etc.
+#time cost, vehicle depreciation cost, etc. Also maintains the travel time per link for later use to calculate TT matrices.
 
 #NOTES:
 #Assumes link length and speed are coming in as m and m/s
@@ -31,7 +31,11 @@ def convertLinkLength(link_length_km):
 def convertLinkSpeed(link_speed_m_s):
     #start by converting speed from m/s to miles per hour
     speed_mph = float(link_speed_m_s) * 2.23694
+
     return speed_mph
+
+
+
 
 def calcFuelCost(row, length_mi, speed_mph):
     #Calc the MPG based on Mengying's formula as a function of link speed
@@ -105,14 +109,13 @@ if __name__ == '__main__':
     start_time, curtime = mod.startTimer()
     readable = time.ctime(start_time)
     print(readable)
-    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=3600000000) #Max is the number of rows 5405836718 for a 428 GB file
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=261617092) #For 60 links x 30303 x 13 x 114 = 18 GB input file
 
 
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
     parser.add_argument('-path', '--PATH_FILE', required=True, default=None)  #ENTER AS full file path to path_analyst file
-    # parser.add_argument('-mpg_adj', '--MPG_ADJUSTMENT', required=True, default=32400)  #Assume city driving adjustment of 0.8354
     parser.add_argument('-price_per_gal', '--PRICE_PER_GALLON_REGULAR', required=True, default=233.5)  # $2.335 in MN in 2015, enter in cents (233.5 cents)
     parser.add_argument('-vot', '--VALUE_OF_TIME', required=True, default=1803.0)  # MnDOT research states $18.30 or 1803.0 cents
     parser.add_argument('-repaircity', '--REPAIR_COST_CITY', required=True, default=1.932) #Combined (auto + pickup) city Maintenance and Repair costs in cents per veh-mi for 2015
@@ -124,7 +127,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #Read in constants
-    # ADJ = float(args.MPG_ADJUSTMENT)
     PRICE = float(args.PRICE_PER_GALLON_REGULAR)
     VOT = float(args.VALUE_OF_TIME)
     REP_CITY = float(args.REPAIR_COST_CITY)
@@ -136,7 +138,7 @@ if __name__ == '__main__':
 
     reader = mod.readInToDict(args.PATH_FILE)
     #Make writer
-    fieldnames = ['origin', 'deptime', 'destination', 'path_seq', 'fuel_cost', 'repair_cost', 'depreciation_cost', 'irs_cost', 'vot_cost']
+    fieldnames = ['origin', 'deptime', 'destination', 'path_seq', 'link_time', 'fuel_cost', 'repair_cost', 'depreciation_cost', 'irs_cost', 'vot_cost']
     writer = mod.mkDictOutput('link_costs_matrix_{}'.format(curtime), fieldname_list=fieldnames)
 
     #Initiate counting lists
@@ -144,6 +146,7 @@ if __name__ == '__main__':
     or_set = []
     dep_set = []
     dest_set = []
+    nullCounter = 0
 
     for row in reader:
 
@@ -155,8 +158,12 @@ if __name__ == '__main__':
         if row['destination'] not in dest_set:
             dest_set.append(row['destination'])
 
+        if row['link_length'] == None or row['link_speed'] == None or row['link_time'] == None:
+            nullCounter += 1
+            continue
+
         lengthMI = convertLinkLength(row['link_length']) #starts in km need miles
-        speedMPH = convertLinkSpeed(row['link_speed']) #Starts in m need miles
+        speedMPH= convertLinkSpeed(row['link_speed']) #Starts in m need miles
         fuelCost = calcFuelCost(row, lengthMI, speedMPH) #Fuel price = f(speed) * price/gallon
 
         repairCost = calcRepairCost(row, speedMPH, lengthMI)
@@ -166,7 +173,7 @@ if __name__ == '__main__':
 
 
         #Write entry, remember that the written price per link is in cents
-        entry = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'], 'path_seq': row['path_seq'], 'fuel_cost': round(fuelCost, 3),
+        entry = {'origin': row['origin'], 'deptime': row['deptime'], 'destination': row['destination'], 'path_seq': row['path_seq'], 'link_time': row['link_time'], 'fuel_cost': round(fuelCost, 3),
                  'repair_cost': round(repairCost, 3), 'depreciation_cost': round(depCost, 3), 'irs_cost': round(irsCost, 3), 'vot_cost': round(votCost, 3)}
         writer.writerow(entry)
         bar.next()
@@ -177,6 +184,7 @@ if __name__ == '__main__':
     print("Number of origins visited:", len(or_set))
     print("Number of deptimes:", len(dep_set))
     print("Number of destinations visited:", len(dest_set))
+    print("Number of links without a speed: ", nullCounter)
 
     print('Link cost analysis finished')
     mod.elapsedTime(start_time)
