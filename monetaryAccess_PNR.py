@@ -37,7 +37,7 @@ def makeLists():
     pnr_list = [x[0] for x in pnrs]
     print('PNR list created', time.time() - t0)
 
-    cur.execute("SELECT {}.{}.deptime_sec FROM {}.{} GROUP BY deptime_sec ORDER BY deptime_sec;".format(SCHEMA,TABLE1, SCHEMA,TABLE1))
+    cur.execute("SELECT {}.{}.deptime_sec FROM {}.{} GROUP BY deptime_sec ORDER BY deptime_sec;".format(SCHEMA,TABLE2, SCHEMA,TABLE2))
     or_dep = cur.fetchall()
     or_dep_list = [x[0] for x in or_dep]
     print('Deptime list created', time.time() - t0)
@@ -49,25 +49,6 @@ def makeLists():
 
     return origin_list, pnr_list, or_dep_list, dest_list
 
-
-def deptime2SecDict():
-    dep2sec = {}
-    dep2sec['0600'] = 21600
-    dep2sec['0615'] = 22500
-    dep2sec['0630'] = 23400
-    dep2sec['0645'] = 24300
-    dep2sec['0700'] = 25200
-    dep2sec['0715'] = 26100
-    dep2sec['0730'] = 27000
-    dep2sec['0745'] = 27900
-    dep2sec['0800'] = 28800
-    dep2sec['0815'] = 29700
-    dep2sec['0830'] = 30600
-    dep2sec['0845'] = 31500
-    dep2sec['0900'] = 32400
-
-    return dep2sec
-
 #This function relys on the db structure of the tt matrices already imported into postgresql.
 #Once the tt array has been extracted, convert to numpy array.
 def createPNR2D15(pnr_list, deptime_list):
@@ -75,7 +56,6 @@ def createPNR2D15(pnr_list, deptime_list):
     pnr2d15 = defaultdict(lambda: defaultdict(list))
     for pnr in pnr_list:
         for deptime in deptime_list:
-
             query = """SELECT traveltime
                            FROM {}.{}
                            WHERE origin = %s AND deptime_sec = %s
@@ -92,6 +72,7 @@ def createPNR2D15(pnr_list, deptime_list):
             tt_array = np.array(tt_list)
 
             pnr2d15[pnr][deptime] = tt_array
+
         print('PNR {} has been added to PNR2d15 dictionary'.format(pnr))
         mod.elapsedTime(start_time)
     return pnr2d15
@@ -110,33 +91,70 @@ def createJobsDict():
     return jobs_dict
 
 
+#Query the t2pnr matrix for matching origin, deptime_sec, pnr combo.
+#Use when multiple departure times have been calculated for o2pnr matrix
+def matchOriginAndTime(origin, deptime, pnr, scenario, null_counter):
 
-
-#Query the o2pnr matrix for matching origin, deptime_sec, pnr combo
-def matchOrigin(origin, deptime, pnr, scenario, null_counter):
     query = """SELECT traveltime
                FROM {}.{}
                WHERE origin = %s AND deptime_sec = %s AND destination = %s;"""
-    cur.execute(query.format(SCHEMA,TABLE1), (origin, deptime, pnr))
-    tt = cur.fetchall()
+    try:
+        cur.execute(query.format(SCHEMA,TABLE1), (origin, deptime, pnr))
+        tt = cur.fetchall()
+        or_tt = int(tt[0][0])
+
+    except:
+        print('Origin {} cannot reach PNR {} within 3.5 hours'.format(origin, pnr))
+        or_tt = None
 
     query2 = """SELECT {}
                FROM {}.{}
                WHERE origin = %s AND deptime_sec = %s AND destination = %s;"""
 
-    #In many cases an origin may have a tt but not a cost for the selected PNR, if the tt to that PNR is greater than 40 minutes
-    #which is what was calculated by the path analyst program.
+    #In cases where the origin to PNR path exceeded 3.5 hours, a cost may not have been calculated for the OD pair.
     try:
         cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, deptime, pnr))
         c = cur.fetchall()
-        value = round(float(c[0][0]), 2)
-        print('Value:', value)
+        cost = round(float(c[0][0]), 2)
 
     except:
         null_counter += 1
-        value = 10000  #=$100.00
+        cost = 10000  #=$100.00
 
-    return int(tt[0][0]), value, null_counter
+    return or_tt, cost, null_counter
+
+#Query the o2pnr matrix for matching origin and pnr combo.
+#Version removes reliance on o2pnr deptime due to single departure time calculated for auto trip.
+def matchOrigin(origin, deptime, pnr, scenario, null_counter):
+
+    query = """SELECT traveltime
+               FROM {}.{}
+               WHERE origin = %s AND destination = %s;"""
+    try:
+        cur.execute(query.format(SCHEMA,TABLE1), (origin, pnr))
+        tt = cur.fetchall()
+        or_tt = int(tt[0][0])
+
+    except:
+        print('Origin {} cannot reach PNR {} within 3.5 hours'.format(origin, pnr))
+        or_tt = None
+
+    query2 = """SELECT {}
+               FROM {}.{}
+               WHERE origin = %s AND destination = %s;"""
+
+    #In cases where the origin to PNR path exceeded 3.5 hours, a cost may not have been calculated for the OD pair.
+    try:
+        cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, pnr))
+        c = cur.fetchall()
+        cost = round(float(c[0][0]), 2)
+
+    except:
+        null_counter += 1
+        cost = 10000  #=$100.00
+
+    or_tt_cost_tup = np.array([or_tt, cost])
+    return or_tt_cost_tup, null_counter
 
 #Place depsum values into a 15 minute bin. Ex. 6:05 will get placed in the 6:15 bin.
 #Bins are rounded up to allow for transfer time between origin egress to destination ingress
@@ -254,7 +272,7 @@ if __name__ == '__main__':
     readable = time.ctime(start_time)
     t0 = time.time()
     print(readable)
-    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=54000)
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=3030)
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
@@ -263,16 +281,17 @@ if __name__ == '__main__':
     parser.add_argument('-schema', '--SCHEMA_NAME', required=True, default=None)  # ENTER AS ttmatrices
     parser.add_argument('-table1', '--TABLE1_NAME', required=True, default=None)  #Table 1 in schema, i.e. o2pnr
     parser.add_argument('-table2', '--TABLE2_NAME', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
-    parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
-    parser.add_argument('-costtab', '--PATH_COST_TABLE_NAME', required=True, default=None)  #Path cost table in schema, i.e. path_cost
+    parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Table 2 in schema, i.e. jobs
+    parser.add_argument('-costtab', '--PATH_COST_TABLE_NAME', required=True, default=None)  #Path cost table in schema, i.e. t2pnr_auto_cost
     parser.add_argument('-lim', '--CALC_LIMIT', required=True, default=32400)  #Calculation cutoff, i.e. 32400 = 9:00 AM
     parser.add_argument('-scen', '--SCENARIO', required=True, default=None)  #Cost scenario to calc access from, i.e. A, B, C
-    parser.add_argument('-fare', '--FARE', required=True, default=325)  #Rush fare is $3.35 otherwise put $0.00 for other scenarios
+    parser.add_argument('-fare', '--FARE', required=True, default=325)  #Rush fare is $3.25 otherwise put $0.00 for other scenarios
     parser.add_argument('-vot', '--VALUE_OF_TIME', required=True, default=1803)  #Value of time in cents, i.e. $18.03 based on USDOT
     parser.add_argument('-or', '--ORIGIN_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-pnr', '--PNR_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-dep', '--DEPTIME_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-dest', '--DESTINATION_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
+
 
 
 
@@ -289,7 +308,8 @@ if __name__ == '__main__':
     FARE = args.FARE
     if args.VALUE_OF_TIME:
         VOT = int(args.VALUE_OF_TIME)
-    TRANSFER = 300
+    #Removed Transfer on 7/13/18
+    #TRANSFER = 300
 
 
     try:
@@ -319,7 +339,7 @@ if __name__ == '__main__':
     # destination_list = mod.readList(args.DESTINATION_LIST, str)
 
 
-    DEP2_SEC_DICT = deptime2SecDict()
+
     DEST_NUM = len(destination_list)
     print('Dest Num=', DEST_NUM)
     nullCounter = 0
@@ -332,7 +352,8 @@ if __name__ == '__main__':
     #THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
     THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
                            1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
-                           1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400]
+                           1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
 
     # Create pnr2d15 dict in memory
     PNR2D15 = createPNR2D15(pnrList, deptimeList)
@@ -342,8 +363,6 @@ if __name__ == '__main__':
 
     for origin in reversed(originList):
 
-
-
         for deptime in deptimeList:
 
             # Initiate travel time list to destination set, start with max time then update with min.
@@ -352,13 +371,13 @@ if __name__ == '__main__':
             #Iteratively update destTTPrev with minimum travel times.
             for pnr in pnrList:
 
-                #Return origin TT and the automobile cost
-                orTT, a_cost, nullCounter = matchOrigin(origin, deptime, pnr, SCENARIO, nullCounter)
+                #Return origin TT and the automobile cost in a numpy array
+                orTT_cost_tup, nullCounter = matchOrigin(origin, deptime, pnr, SCENARIO, nullCounter)
 
-                #If origin cannot reach the chosen PNR in 90 minutes, pick a new PNR
-                if orTT is not None:
+                #If origin cannot reach the chosen PNR in 3.5 hours, pick a new PNR
+                if orTT_cost_tup[0] is not None:
 
-                    depsum = deptime + orTT
+                    depsum = deptime + orTT_cost_tup[0]
 
                     # If depsum is past the calculation window (9:00 AM), do not link paths.
                     if depsum < LIMIT:
@@ -369,17 +388,18 @@ if __name__ == '__main__':
                         if depsumBin != LIMIT:
 
                             #Time from origin and transfer (int)  = originTT (int) + transfer (int)
-                            orTT_trans = np.array([orTT + TRANSFER, a_cost])
+                            #Removing the transfer penalty to not double count transfer time.
+                            #orTT_trans = np.array([orTT + TRANSFER, a_cost])
 
                             #Create an array of tuples that contains the total tt for each destination and the auto cost
-                            total_tt_array = PNR2D15[pnr][depsumBin] + orTT_trans
+                            total_tt_array = PNR2D15[pnr][depsumBin] + orTT_cost_tup #orTT_trans
 
-                            print('time5', time.time() - t0)
+                            #print('time5', time.time() - t0)
                             #Alternative for tuples:
                             #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, total_tt_array)]
                             #Alternative for numpy list of lists
                             bestTT = np.minimum(destTTPrev, total_tt_array)
-                            print('time6', time.time() - t0)
+                            #print('time6', time.time() - t0)
 
                             destTTPrev = bestTT
 
@@ -391,6 +411,6 @@ if __name__ == '__main__':
         print(" ")
 
     bar.finish()
-    print('{} origin-deptime-pnr combos did not have an assigned auto cost due to path analysis file size limitations'.format(nullCounter))
+    print('{} origin-deptime-pnr combos exceeded 3.5 hours of travel time thus do not have value in DB'.format(nullCounter))
     readable_end = time.ctime(time.time() - t0)
     print(readable_end)
