@@ -37,64 +37,51 @@ def makeLists():
     or_dep_list = [x[0] for x in or_dep]
     print('Deptime list created', time.time() - t0)
 
-    cur.execute("SELECT {}.{}.destination FROM {}.{} GROUP BY destination ORDER BY destination ASC;".format(SCHEMA,TABLE2, SCHEMA,TABLE2))
-    dest = cur.fetchall()
-    dest_list = [x[0] for x in dest]
+    dest_list = origin_list.copy()
     print('Destination list created', time.time() - t0)
 
     return origin_list, or_dep_list, dest_list
 
-
-def deptime2SecDict():
-    dep2sec = {}
-    dep2sec['0600'] = 21600
-    dep2sec['0615'] = 22500
-    dep2sec['0630'] = 23400
-    dep2sec['0645'] = 24300
-    dep2sec['0700'] = 25200
-    dep2sec['0715'] = 26100
-    dep2sec['0730'] = 27000
-    dep2sec['0745'] = 27900
-    dep2sec['0800'] = 28800
-    dep2sec['0815'] = 29700
-    dep2sec['0830'] = 30600
-    dep2sec['0845'] = 31500
-    dep2sec['0900'] = 32400
-
-    return dep2sec
-
 #This function relys on the db structure of the tt matrices already imported into postgresql.
 #Once the tt array has been extracted, convert to numpy array.
-def createPNR2D15(origin_list, deptime_list):
+def createTAZ2TAZ(origin_list, deptime_list):
     print('Building OD dictionary in memory...')
     o2d = defaultdict(lambda: defaultdict(list))
     for origin in origin_list:
         for deptime in deptime_list:
 
-            query = """SELECT traveltime
+            query_tt = """SELECT traveltime
                            FROM {}.{}
                            WHERE origin = %s AND deptime_sec = %s
                            ORDER BY destination ASC"""
 
-            cur.execute(query.format(SCHEMA, TABLE2), (origin, deptime))  # next_bin,
+            cur.execute(query_tt.format(SCHEMA, TABLE1), (origin, deptime))  # next_bin,
 
             tt = cur.fetchall()  # Listed by ordered destination
 
+            query_cost = """SELECT {}
+                            FROM {}.{}
+                            WHERE origin = %s AND deptime_sec = %s
+                            ORDER BY destination ASC"""
+            cur.execute(query_cost.format(SCHEMA, COSTS), (origin, deptime))
+
+            cost = cur.fetchall()  #Listed by ordered destination
+
             #Create a list of lists [tt, cost] then transform to numpy array
             #Initialize cost as an empty value
-            tt_list = [[dest_tt[0], ] for dest_tt in tt]
+            tt_cost_list = [[dest_tt[0], dest_cost[0] ] for dest_tt, dest_cost in zip(tt, cost)]
 
-            tt_array = np.array(tt_list)
+            tt_array = np.array(tt_cost_list)
 
             o2d[origin][deptime] = tt_array
-        print('origin {} has been added to o2d dictionary'.format(pnr))
+        print('origin {} has been added to o2d dictionary'.format(origin))
         mod.elapsedTime(start_time)
     return o2d
 
 def createJobsDict():
     print('Building Jobs Dict', time.time() - t0)
     jobs_dict = {}
-    query = """SELECT geoid10, c000 
+    query = """SELECT taz, sumc000
                FROM {}.{};"""
     cur.execute(query.format(SCHEMA, JOBS))
     jobs = cur.fetchall()
@@ -117,63 +104,62 @@ def createParkDict():
     print('Capacity Weighted Average Cost Dictionary Now in Memory', time.time() - t0)
     return park_dict
 
-#Query the o2pnr matrix for matching origin, deptime_sec, pnr combo
-def matchOrigin(origin, deptime, pnr, scenario, null_counter):
-    query = """SELECT traveltime
-               FROM {}.{}
-               WHERE origin = %s AND deptime_sec = %s AND destination = %s;"""
-    cur.execute(query.format(SCHEMA,TABLE1), (origin, deptime, pnr))
-    tt = cur.fetchall()
-
-    query2 = """SELECT {}
-               FROM {}.{}
-               WHERE origin = %s AND deptime_sec = %s AND destination = %s;"""
-
-    #In many cases an origin may have a tt but not a cost for the selected PNR, if the tt to that PNR is greater than 40 minutes
-    #which is what was calculated by the path analyst program.
-    try:
-        cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, deptime, pnr))
-        c = cur.fetchall()
-        value = round(float(c[0][0]), 2)
-        print('Value:', value)
-
-    except:
-        null_counter += 1
-        value = 10000  #=$100.00
-
-    return int(tt[0][0]), value, null_counter
-
-#Place depsum values into a 15 minute bin. Ex. 6:05 will get placed in the 6:15 bin.
-#Bins are rounded up to allow for transfer time between origin egress to destination ingress
-def linkBins(depsum, deptime_list):
-    ##Top portion remains commented out until larger matrices are calculated
-    # more_time = [900*i for i in range(1, 7)]
-    # last_time = deptime_list_sort[-1] #Grab last time in list : 9:00 = 32400
-    # extend_deptime_list_sort = list(deptime_list_sort)
-    # for k in more_time:
-    #     extend_deptime_list_sort.append((last_time+k))
-    # print('Extended deptime list:', extend_deptime_list_sort)
-    # Assign depsum to the 15 minute bin
-    for index, dptm in enumerate(deptime_list):
-        next = index + 1
-        if next < len(deptime_list):
-            if depsum > dptm and depsum <=  deptime_list[next]:
-                # Depsum_bin is in the form of seconds!
-                depsum_bin = deptime_list[next] #extend_deptime_list_sort[next]
-                return depsum_bin #Seconds, contains times in the 15 minutes less than this depsum_bin
+# #Query the o2pnr matrix for matching origin, deptime_sec, pnr combo
+# def origin2TimeCost(origin, deptime, scenario, null_counter):
+#     query = """SELECT traveltime
+#                FROM {}.{}
+#                WHERE origin = %s AND deptime_sec = %s;"""
+#     #This should return a list of tt that correspond with taz destinations
+#     cur.execute(query.format(SCHEMA,TABLE1), (origin, deptime))
+#     tt = cur.fetchall()
+#
+#     query2 = """SELECT {}
+#                FROM {}.{}
+#                WHERE origin = %s AND deptime_sec = %s;"""
+#
+#     #This should return a list of cost that correspond with taz destinations
+#     cur.execute(query2.format(scenario, SCHEMA, COSTS), (origin, deptime))
+#     c = cur.fetchall()
+#     value = round(float(c[0][0]), 2)
+#     print('Value:', value)
+#
+#
+#     null_counter += 1
+#     value = 10000  #=$100.00
+#
+#     return int(tt[0][0]), value, null_counter
+#
+# #Place depsum values into a 15 minute bin. Ex. 6:05 will get placed in the 6:15 bin.
+# #Bins are rounded up to allow for transfer time between origin egress to destination ingress
+# def linkBins(depsum, deptime_list):
+#     ##Top portion remains commented out until larger matrices are calculated
+#     # more_time = [900*i for i in range(1, 7)]
+#     # last_time = deptime_list_sort[-1] #Grab last time in list : 9:00 = 32400
+#     # extend_deptime_list_sort = list(deptime_list_sort)
+#     # for k in more_time:
+#     #     extend_deptime_list_sort.append((last_time+k))
+#     # print('Extended deptime list:', extend_deptime_list_sort)
+#     # Assign depsum to the 15 minute bin
+#     for index, dptm in enumerate(deptime_list):
+#         next = index + 1
+#         if next < len(deptime_list):
+#             if depsum > dptm and depsum <=  deptime_list[next]:
+#                 # Depsum_bin is in the form of seconds!
+#                 depsum_bin = deptime_list[next] #extend_deptime_list_sort[next]
+#                 return depsum_bin #Seconds, contains times in the 15 minutes less than this depsum_bin
 
 
 #Place the current row's destination into threshold bins based on its travel time
 #If destination cannot be reached, then do not include in output.
 #Output is an ordered dictionary mapping threshold to list of GEOIDs that can be reached
-def calcTimeAccess(origin, deptime, destination_list, destTTPrev, writer_time):
+def calcTimeAccess(origin, deptime, destination_list, or_slice, writer_time):
     thresh_dict = OrderedDict()
 
     for x in THRESHOLD_LIST_MINUTE:
         thresh_dict[x] = []
 
     # Iterate through the destinations and their respective TTs.
-    for dest, totalTT_tup in zip(destination_list, destTTPrev):
+    for dest, totalTT_tup in zip(destination_list, or_slice):
         # Only assign jobs where destination can be reached
         #totalTT_tup[0] is travel time, while tup[1] is auto cost
         if totalTT_tup[0] < 2147483647:
@@ -189,7 +175,7 @@ def calcTimeAccess(origin, deptime, destination_list, destTTPrev, writer_time):
 
     writeAccessFile(origin, deptime, thresh_dict, 'threshold', writer_time)
 
-def calcMonetaryAccess(origin, deptime, destination_list, destTTPrev, writer_cost):
+def calcMonetaryAccess(origin, deptime, destination_list, or_slice, writer_cost):
     #print('time8', time.time() - t0)
     cost_dict = OrderedDict()
 
@@ -197,13 +183,13 @@ def calcMonetaryAccess(origin, deptime, destination_list, destTTPrev, writer_cos
         cost_dict[y] = []
 
     # Iterate through the destinations and their respective TTs.
-    for dest, totalTT_tup in zip(destination_list, destTTPrev):
+    for dest, tt_cost_tup in zip(destination_list, or_slice):
         # Only assign jobs where destination can be reached
         #totalTT_tup[0] is travel time, while tup[1] is auto cost
-        if totalTT_tup[0] < 2147483647:
-            time_cost = totalTT_tup[0] * VOT/3600 #If VOT = 0, then VOT is not added to total cost
+        if tt_cost_tup[0] < 2147483647:
+            time_cost = tt_cost_tup[0] * VOT/3600 #If VOT = 0, then VOT is not added to total cost
             #Auto costs along path plus parking cost associated with destination + time costs
-            a_p_cost = totalTT_tup[1] + PARKING[dest] + time_cost
+            a_p_cost = tt_cost_tup[1] + PARKING[dest] + time_cost
 
             for cost in THRESHOLD_COST_LIST:
                 # Place destination into only the first cost threshold that allows that destination to be reached
@@ -235,8 +221,8 @@ def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
 
         if len(dest_list) > 0:
 
-            for geoid in dest_list:
-                thresh_level_access += JOBS[geoid]
+            for dest in dest_list:
+                thresh_level_access += JOBS[dest]
 
             access = thresh_level_access + access_prev
 
@@ -324,8 +310,6 @@ if __name__ == '__main__':
     # deptimeList = mod.readList(args.DEPTIME_LIST, int)
     # destination_list = mod.readList(args.DESTINATION_LIST, str)
 
-
-    DEP2_SEC_DICT = deptime2SecDict()
     DEST_NUM = len(destination_list)
     print('Dest Num=', DEST_NUM)
     nullCounter = 0
@@ -338,10 +322,11 @@ if __name__ == '__main__':
     #THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
     THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
                            1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
-                           1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400]
+                           1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
 
     # Create pnr2d15 dict in memory
-    O2D = createPNR2D15(originList, deptimeList)
+    O2D = createTAZ2TAZ(originList, deptimeList)
     #Make jobs dict in memory
     JOBS = createJobsDict()
     #Make parking dict in memory
@@ -350,55 +335,16 @@ if __name__ == '__main__':
 
     for origin in reversed(originList):
 
-
-
         for deptime in deptimeList:
+            or_slice = O2D[origin][deptime]
 
-            # Initiate travel time list to destination set, start with max time then update with min.
-            destTTPrev = np.array([[2147483647, ]] * DEST_NUM)
-
-            #Iteratively update destTTPrev with minimum travel times.
-            for pnr in pnrList:
-
-                #Return origin TT and the automobile cost
-                orTT, a_cost, nullCounter = matchOrigin(origin, deptime, pnr, SCENARIO, nullCounter)
-
-                #If origin cannot reach the chosen PNR in 90 minutes, pick a new PNR
-                if orTT is not None:
-
-                    depsum = deptime + orTT
-
-                    # If depsum is past the calculation window (9:00 AM), do not link paths.
-                    if depsum < LIMIT:
-
-
-                        # Choose dest_deptime based on closest 15 min bin.
-                        depsumBin = linkBins(depsum, deptimeList)
-                        if depsumBin != LIMIT:
-
-                            #Time from origin and transfer (int)  = originTT (int) + transfer (int)
-                            orTT_trans = np.array([orTT + TRANSFER, a_cost])
-
-                            #Create an array of tuples that contains the total tt for each destination and the auto cost
-                            total_tt_array = PNR2D15[pnr][depsumBin] + orTT_trans
-
-                            print('time5', time.time() - t0)
-                            #Alternative for tuples:
-                            #bestTT = [min(pair, key=lambda x:x[0]) for pair in zip(destTTPrev, total_tt_array)]
-                            #Alternative for numpy list of lists
-                            bestTT = np.minimum(destTTPrev, total_tt_array)
-                            print('time6', time.time() - t0)
-
-                            destTTPrev = bestTT
-
-            calcTimeAccess(origin, deptime, destination_list, destTTPrev, writer_time)
-            calcMonetaryAccess(origin, deptime, destination_list, destTTPrev, writer_cost)
+            calcTimeAccess(origin, deptime, destination_list, or_slice, writer_time)
+            calcMonetaryAccess(origin, deptime, destination_list, or_slice, writer_cost)
 
         print('Origin {} finished'.format(origin), time.time() - t0)
         bar.next()
         print(" ")
 
     bar.finish()
-    print('{} origin-deptime-pnr combos did not have an assigned auto cost due to path analysis file size limitations'.format(nullCounter))
     readable_end = time.ctime(time.time() - t0)
     print(readable_end)
