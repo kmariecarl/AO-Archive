@@ -109,8 +109,10 @@ if __name__ == '__main__':
     start_time, curtime = mod.startTimer()
     readable = time.ctime(start_time)
     print(readable)
-    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=261617092) #For 60 links x 30303 x 13 x 114 = 18 GB input file
-
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=51813000) #For 150 links x 30303 x 1 x 114 = 7.65 GB
+    #List of approximate line counts for different file sizes:
+    #max = 110696205 for 300 links x 3027 x 1 x 114 = 7.65 GB
+    #max = 261617092 For 60 links x 30303 x 13 x 114 = 18 GB input file
 
 
     # Parameterize file paths

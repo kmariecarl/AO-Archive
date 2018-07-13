@@ -30,7 +30,7 @@ if __name__ == '__main__':
     start_time, curtime = mod.startTimer()
     readable = time.ctime(start_time)
     print(readable)
-    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=261617092)
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=110696205)
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
