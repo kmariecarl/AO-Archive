@@ -38,7 +38,7 @@ def makeThrshldList(data_dict):
     # print('Threshold list:', list1)
     return sorted_thrshlds
 
-
+#This function makes a list of labels found in each file
 def makeLabelList(data_dict):
     # Grab the first key of the dictionary in order to grab one set of the labels. Ex. literally just grabs the number 1800.
     first_key = list(data_dict)[0]
@@ -47,8 +47,24 @@ def makeLabelList(data_dict):
     # label is a string due to makeInputFile
     for label in inner_dict:
         label_list.append(int(label))
+
+
     # print('Label list:', label_list)
     return label_list
+
+#This function confirms that labels from both the base and change results are the same. If one file has a value for a
+#label and the other doesn't, that label will be skipped.
+def cleanLabelList(list_base, list_change):
+    missing_label_list = np.setdiff1d(list_base, list_change)
+    final_label_list = []
+    for x in list_base:
+        if x not in missing_label_list:
+            final_label_list.append(x)
+    return final_label_list
+
+
+
+
 
 
 # This function combines all calculated values for each label (different data structures used).
@@ -172,6 +188,7 @@ import math
 import os
 import datetime
 import argparse
+import numpy as np
 
 
 if __name__ == "__main__":
@@ -184,7 +201,9 @@ if __name__ == "__main__":
     currentTime = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
     baseDict = makeInputDict(args.BASE_FILE)
     changeDict = makeInputDict(args.UPDATE_FILE)
-    labellist = makeLabelList(baseDict)
+    labellist_base = makeLabelList(baseDict)
+    labellist_change = makeLabelList(changeDict)
+    labellist = cleanLabelList(labellist_base, labellist_change)
     thrshldlist = makeThrshldList(baseDict)
     final_results = calcAccessValues(labellist, thrshldlist, baseDict, changeDict)
     output(final_results, thrshldlist)
