@@ -8,7 +8,7 @@
 import argparse
 import time
 from myToolsPackage import matrixLinkModule as mod
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 from myToolsPackage.progress import bar
 
 # --------------------------
@@ -22,14 +22,13 @@ def createInternalDict(input_file, bar):
         if counter == 0:
             threshold_list = createThresholdList(row)
 
-        else:
-            transpose_dict[row['label']] = OrderedDict()
-            for thresh in threshold_list:
-                if row[thresh] is '':
-                    value = 0
-                else:
-                    value = row[thresh]
-                transpose_dict[row['label']][thresh] = value
+        transpose_dict[row['label']] = OrderedDict()
+        for thresh in threshold_list:
+            if row[thresh] is '':
+                value = 0
+            else:
+                value = row[thresh]
+            transpose_dict[row['label']][thresh] = value
 
         counter += 1
         bar.next()
