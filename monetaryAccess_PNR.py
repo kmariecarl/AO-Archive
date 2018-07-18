@@ -90,6 +90,18 @@ def createJobsDict():
     print('Jobs Dict Now in Memory', time.time() - t0)
     return jobs_dict
 
+def createTransitAccessDict():
+    print('Building Walk + Transit Accessibility at TAZ Dict', time.time() - t0)
+    transit_dict = defaultdict(lambda: dict())
+    query = """SELECT label, threshold, jobs
+                FROM {}.{};"""
+    cur.execute(query.format(SCHEMA, TRANSIT_TABLE))
+    transit = cur.fetchall()
+    for tup in transit:
+        transit_dict[tup[0]][tup[1]] = tup[2]
+
+    print('Walk + Transit at Accessibility at TAZ dict in memory', time.time() - t0)
+    return transit_dict
 
 #Query the t2pnr matrix for matching origin, deptime_sec, pnr combo.
 #Use when multiple departure times have been calculated for o2pnr matrix
@@ -250,7 +262,11 @@ def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
             for geoid in dest_list:
                 thresh_level_access += JOBS[geoid]
 
-            access = thresh_level_access + access_prev
+            if threshold_type != 'threshold':
+                access = thresh_level_access + access_prev
+
+            else:
+                access = thresh_level_access + access_prev  + TRANSIT_ACCESS[origin][thresh] # + transit access at origin for selected threshold
 
 
             entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): value, 'jobs': access}
@@ -283,6 +299,7 @@ if __name__ == '__main__':
     parser.add_argument('-table2', '--TABLE2_NAME', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Table 2 in schema, i.e. jobs
     parser.add_argument('-costtab', '--PATH_COST_TABLE_NAME', required=True, default=None)  #Path cost table in schema, i.e. t2pnr_auto_cost
+    parser.add_argument('-transittab', '--TRANSIT_TABLE_NAME', required=True, default=None)  #Walk+Transit at TAZ table in schema, i.e. taz_transit_access
     parser.add_argument('-lim', '--CALC_LIMIT', required=True, default=32400)  #Calculation cutoff, i.e. 32400 = 9:00 AM
     parser.add_argument('-scen', '--SCENARIO', required=True, default=None)  #Cost scenario to calc access from, i.e. A, B, C
     parser.add_argument('-fare', '--FARE', required=True, default=325)  #Rush fare is $3.25 otherwise put $0.00 for other scenarios
@@ -303,6 +320,7 @@ if __name__ == '__main__':
     TABLE2 = args.TABLE2_NAME
     JOBS = args.JOBS_TABLE_NAME
     COSTS = args.PATH_COST_TABLE_NAME
+    TRANSIT_TABLE = args.TRANSIT_TABLE_NAME
     LIMIT = int(args.CALC_LIMIT)
     SCENARIO = args.SCENARIO
     FARE = args.FARE
@@ -355,11 +373,12 @@ if __name__ == '__main__':
                            1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
                            2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
 
-    # Create pnr2d15 dict in memory
-    PNR2D15 = createPNR2D15(pnrList, deptimeList)
+    #Make walk+transit access dict in memory
+    TRANSIT_ACCESS = createTransitAccessDict()
     #Make jobs dict in memory
     JOBS = createJobsDict()
-
+    # Create pnr2d15 dict in memory
+    PNR2D15 = createPNR2D15(pnrList, deptimeList)
 
     for origin in reversed(originList):
 
