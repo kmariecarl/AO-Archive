@@ -262,13 +262,8 @@ def writeAccessFile(origin, deptime, threshold_dict, threshold_type, writer):
             for geoid in dest_list:
                 thresh_level_access += JOBS[geoid]
 
-            if threshold_type != 'threshold':
-                access = thresh_level_access + access_prev
 
-            else:
-                access = thresh_level_access + access_prev  + TRANSIT_ACCESS[origin][thresh] # + transit access at origin for selected threshold
-
-
+            access = thresh_level_access + access_prev #+ TRANSIT_ACCESS[origin][value] transit access at origin for selected threshold
             entry = {'label': origin, 'deptime': mod.back2Time(deptime), '{}'.format(threshold_type): value, 'jobs': access}
             writer.writerow(entry)
             access_prev = access
@@ -373,7 +368,7 @@ if __name__ == '__main__':
                            1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
                            2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
 
-    #Make walk+transit access dict in memory
+    #Make walk+transit access dict in memory--not in use but should figure out how to apply for cost access
     TRANSIT_ACCESS = createTransitAccessDict()
     #Make jobs dict in memory
     JOBS = createJobsDict()
