@@ -63,7 +63,7 @@ def createTAZ2TAZ(origin_list, deptime_list):
                             FROM {}.{}
                             WHERE origin = %s AND deptime_sec = %s
                             ORDER BY destination ASC"""
-            cur.execute(query_cost.format(SCHEMA, COSTS), (origin, deptime))
+            cur.execute(query_cost.format(SCENARIO, SCHEMA, COSTS), (origin, deptime))
 
             cost = cur.fetchall()  #Listed by ordered destination
 
@@ -74,8 +74,9 @@ def createTAZ2TAZ(origin_list, deptime_list):
             tt_array = np.array(tt_cost_list)
 
             o2d[origin][deptime] = tt_array
-        print('origin {} has been added to o2d dictionary'.format(origin))
+
         mod.elapsedTime(start_time)
+    print('All origins have been added to o2d dictionary')
     return o2d
 
 def createJobsDict():
@@ -95,7 +96,7 @@ def createJobsDict():
 def createParkDict():
     print('Building parking dictionary', time.time() - t0)
     park_dict = {}
-    query = """SELECT origin, avgcostbyorigin from {}.{};"""
+    query = """SELECT taz2, cpmeanwtav from {}.{};"""
     cur.execute(query.format(SCHEMA, PARK))
     park = cur.fetchall()
     for tup in park:
@@ -189,6 +190,8 @@ def calcMonetaryAccess(origin, deptime, destination_list, or_slice, writer_cost)
         if tt_cost_tup[0] < 2147483647:
             time_cost = tt_cost_tup[0] * VOT/3600 #If VOT = 0, then VOT is not added to total cost
             #Auto costs along path plus parking cost associated with destination + time costs
+            print(tt_cost_tup[1])
+            print(PARKING[dest])
             a_p_cost = tt_cost_tup[1] + PARKING[dest] + time_cost
 
             for cost in THRESHOLD_COST_LIST:
@@ -256,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('-table1', '--TABLE1_NAME', required=True, default=None)  #Table 1 in schema, i.e. o2d or auto_taz2taz_tt
     parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Jobs table, i.e. jobs, taz_jobs
     parser.add_argument('-costtab', '--PATH_COST_TABLE_NAME', required=True, default=None)  #Path cost table in schema, i.e. path_cost
-    parser.add_argument('-parktab', '--PARK_COST_TABLE_NAME', required=True, default=None)  #Parking cost table in schema, i.e. wtavgcost_2018
+    parser.add_argument('-parktab', '--PARK_COST_TABLE_NAME', required=True, default=None)  #Parking cost table in schema, i.e. wtavgcost_2018, taz_capwtparkcost
     parser.add_argument('-lim', '--CALC_LIMIT', required=True, default=32400)  #Calculation cutoff, i.e. 32400 = 9:00 AM
     parser.add_argument('-scen', '--SCENARIO', required=True, default=None)  #Cost scenario to calc access from, i.e. A, B, C
     parser.add_argument('-vot', '--VALUE_OF_TIME', required=True, default=1803)  #Value of time in cents, i.e. $18.03 based on USDOT
@@ -272,16 +275,13 @@ if __name__ == '__main__':
     DB_NAME = args.DB_NAME
     SCHEMA = args.SCHEMA_NAME
     TABLE1 = args.TABLE1_NAME
-    TABLE2 = args.TABLE2_NAME
     JOBS = args.JOBS_TABLE_NAME
     COSTS = args.PATH_COST_TABLE_NAME
     PARK = args.PARK_COST_TABLE_NAME
     LIMIT = int(args.CALC_LIMIT)
     SCENARIO = args.SCENARIO
-    FARE = args.FARE
     if args.VALUE_OF_TIME:
         VOT = int(args.VALUE_OF_TIME)
-    TRANSFER = 300
 
 
     try:
