@@ -254,7 +254,7 @@ if __name__ == '__main__':
     parser.add_argument('-db', '--DB_NAME', required=True, default=None)  #ENTER AS TTMatrixLink
     parser.add_argument('-schema', '--SCHEMA_NAME', required=True, default=None)  # ENTER AS ttmatrices
     parser.add_argument('-table1', '--TABLE1_NAME', required=True, default=None)  #Table 1 in schema, i.e. o2d or auto_taz2taz_tt
-    parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Jobs table
+    parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Jobs table, i.e. jobs, taz_jobs
     parser.add_argument('-costtab', '--PATH_COST_TABLE_NAME', required=True, default=None)  #Path cost table in schema, i.e. path_cost
     parser.add_argument('-parktab', '--PARK_COST_TABLE_NAME', required=True, default=None)  #Parking cost table in schema, i.e. wtavgcost_2018
     parser.add_argument('-lim', '--CALC_LIMIT', required=True, default=32400)  #Calculation cutoff, i.e. 32400 = 9:00 AM
