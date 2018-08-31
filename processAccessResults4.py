@@ -13,7 +13,7 @@
 # --------------------------
 
 # Create a dictionary of dictionaries for mapping thresholds to blockIDs to accessibility values.
-def makeInputDict(access_file):
+def makeInputDict(access_file, access_field):
     with open(access_file, 'r') as input:
         reader = csv.DictReader(input)
         # Create dictionary containing all data
@@ -24,7 +24,7 @@ def makeInputDict(access_file):
             if int(row['threshold']) not in outerDict:
                 # If not, add threshold to dictionary
                 outerDict[int(row['threshold'])] = {}
-            outerDict[int(row['threshold'])][int(row['label'])] = int(row['jobs'])
+            outerDict[int(row['threshold'])][int(row['label'])] = int(row[access_field])
         return outerDict
 
 
@@ -86,9 +86,10 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict):
             #threshold + label combo the jobs value from the base dict so that when change is calculated, no change occurs.
             if label not in change_dict[thrshld]:
                 change_dict[thrshld] = {'label': label, 'jobs': baseDict[thrshld][label]}
-            # Obtain the weighted accessibility values for the baseline and changed files
+            # Obtain the weighted accessibility values for the baseline and changed files, and print out
             base_access_wt = calcWeightedAccess(label, label_list, thrshld_list, base_dict)
             chg_access_wt = calcWeightedAccess(label, label_list, thrshld_list, change_dict)
+            column['wt_bs'], column['wt_chg'] = base_access_wt, chg_access_wt
             # Calculate the raw (as in the abs difference) and percent change between the WEIGHTED accessibility values
             column['wt_raw_chg'], column['wt_pct_chg'] = rawPctWeightAccess(label, base_access_wt, chg_access_wt)
             # Iteratively make names for columns
@@ -135,7 +136,7 @@ def rawPctWeightAccess(label, base_acs_wt, change_acs_wt):
     if base_acs_wt == 0:
         pct = 0  # 'Not Defined'
     else:
-        pct = round(diff / float(base_acs_wt), 6)
+        pct = round((diff / float(base_acs_wt))*100, 6)
     return diff, pct
 
 
@@ -154,7 +155,8 @@ def rawValues(label, thrshld, base_dict, chg_dict):
 
 def pctDiff(diff, label, thrshld, base_dict):
     if int(base_dict[thrshld][label]) != 0:
-        pct = round(diff / int(base_dict[thrshld][label]), 6)
+        #Need to multiply by 100 to get percent right for plotting in QGIS and Tilemill
+        pct = round((diff / int(base_dict[thrshld][label]))*100, 6)
     # If the base accessibility is zero, pct is undefined
     else:
         pct = 0  # "Not Defined"
@@ -165,7 +167,7 @@ def pctDiff(diff, label, thrshld, base_dict):
 def output(final_results, thrshld_list):
     with open('processed_results_{}.csv'.format(currentTime), 'w') as outfile:
         # Create fieldnames list iteratively to eliminate user input.
-        fieldnames = ['label', 'wt_raw_chg', 'wt_pct_chg']
+        fieldnames = ['label', 'wt_bs', 'wt_chg', 'wt_raw_chg', 'wt_pct_chg']
         for thrshld in thrshld_list:
             fieldnames.append('rwdf{}'.format(str(thrshld)))
             fieldnames.append('rwpct{}'.format(str(thrshld)))
@@ -196,14 +198,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-bs', '--BASE_FILE', required=True, default=None)
     parser.add_argument('-updt', '--UPDATE_FILE', required=True, default=None)
+    parser.add_argument('-access', '--ACCESS_FIELD', required=True, default=None) #i.e. jobs or C000
     args = parser.parse_args()
 
     currentTime = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-    baseDict = makeInputDict(args.BASE_FILE)
-    changeDict = makeInputDict(args.UPDATE_FILE)
+    baseDict = makeInputDict(args.BASE_FILE, args.ACCESS_FIELD)
+    changeDict = makeInputDict(args.UPDATE_FILE, args.ACCESS_FIELD)
     labellist_base = makeLabelList(baseDict)
     labellist_change = makeLabelList(changeDict)
     labellist = cleanLabelList(labellist_base, labellist_change)
-    thrshldlist = makeThrshldList(baseDict)
+    thrshldlist = makeThrshldList(changeDict)
     final_results = calcAccessValues(labellist, thrshldlist, baseDict, changeDict)
     output(final_results, thrshldlist)
