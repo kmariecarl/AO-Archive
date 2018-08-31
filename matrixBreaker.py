@@ -1,7 +1,6 @@
 
 #Application is used to break large Origin to PNR and PNR to Destination matrices into files by PNR and departure time.
-#This program shall be run after the creation of a TT matrix and before the linking of matrices by TTMatrixLink.py
-#Program architecture relys on o2pnr matrix first being passed, and assumes the user has already created a list of
+#This program shall be run after the creation of a TT matrix and before the linking of matrices by monetaryAccess_PNR.py
 #PNRs, origin_deptimes, destination_deptimes, these are used for comparison within the program.
 #Next the pnr2d matrix is passed as a split directory along with the pre-made pnr and deptime list files. At this time
 #there is no way to efficiently make a destination list file using Matrix Breaker, it's possible but would be slow.
@@ -35,7 +34,7 @@ import glob
 
 #Assumptions for processing split directory:
 #1. Assume a pre-made pnr list is given
-#2. Assume a pre-made origin or destination specific deptimes file has been created.
+#2. Assume that the split directory files have been given the .csv extension
 
 def processSplit(location):
     #Initiate global dictionary
@@ -120,9 +119,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     #Tell the program which field contains the pnr values, answer is either origin or destination
     parser.add_argument('-pnr', '--PNR_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
-    #parser.add_argument('-connect', '--CONNECT_FIELD', required=True, default=None) #Origin or destination depending on which matrix is given
     parser.add_argument('-pnrlist', '--PNR_LIST', required=False, default=None) #File that contain pre-made PNR list
-    #parser.add_argument('-deplist', '--DEPTIME_LIST', required=False, default=None)  #File that contains pre-made departure time list
     parser.add_argument('-split', '--SPLIT_DIR', required=False, default=None) #Provide when using a split directory for large matrices (any matrix over 1 GB)
     args = parser.parse_args()
 
@@ -130,9 +127,8 @@ if __name__ == '__main__':
     FIELDNAMES = ['origin', 'destination', 'deptime', 'traveltime']
 
     #Read in pre-made lists used for comparison within this program
-    EXTERNAL_PNR_LIST = mod.readList(args.PNR_LIST)
-    #Not currently using the external deptime list for comparison.
-    #EXTERNAL_DEPTIME_LIST = mod.readList(args.DEPTIME_LIST)
+    EXTERNAL_PNR_LIST = mod.readList(args.PNR_LIST, 'integer')
+
     #Assign variable field entry according to the PNR field
     if args.PNR_FIELD == 'origin':
         location = 0
