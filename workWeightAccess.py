@@ -44,7 +44,7 @@ def makeInputDict(access_file, access_field, worker_field):
 
 
 #Give the path of the file that contains the pre-calculated accessibility values and the RAC values at the block level.
-ACCESS = os.path.join('..', 'TestScenarios', 'mnpass_crnt_xpres', 'Post_process_access','tl_27_55_mnpass_crnt_xpres_impact_zones.csv')
+#ACCESS = os.path.join('..', 'TestScenarios', 'mnpass_crnt_xpres', 'Post_process_access','tl_27_55_mnpass_crnt_xpres_impact_zones.csv')
 
 if __name__ == "__main__":
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Prompt user for a time window.
-    access_field = input('Type field name that you want to find the worker weighted accessibility value for:')
+    access_field = input('Type field name that you want to find the worker weighted accessibility value for, i.e. rwbs1800:')
     worker_field = input('Type field name containing number of workers, i.e. rac_C000:')
 
     accessList, workerList = makeInputDict(args.ACCESS_FILE, access_field, worker_field)
