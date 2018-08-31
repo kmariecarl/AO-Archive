@@ -1,5 +1,5 @@
 #This script is a variation on the TTMatrixLink2JobsCost.py by connecting origins to destinations using the AUTO and TRANSIT TT matrices
-#and the costs associated with time, fuel and transit fare. Result is a monetary accessibility file.
+#and the costs associated with time, fuel and transit fare. Result is a time and monetary accessibility file.
 
 #Notes:
 #All costs listed in cents. ie. $4.00 listed as 400
@@ -200,7 +200,7 @@ def calcTimeAccess(origin, deptime, destination_list, destTTPrev, writer_time):
     # Iterate through the destinations and their respective TTs.
     for dest, totalTT_tup in zip(destination_list, destTTPrev):
         # Only assign jobs where destination can be reached
-        #totalTT_tup[0] is travel time, while tup[1] is auto cost
+        #totalTT_tup[0] is travel time, while tup[1] is auto cost, tup[2] is PNR
         if totalTT_tup[0] < 2147483647:
             # OTP puts TT in minutes then rounds down, the int() func. always rounds down.
             # Think of TT in terms of 1 min. bins. Ex. A dest with TT=30.9 minutes should not be placed in the 30 min TT list.
@@ -224,7 +224,7 @@ def calcMonetaryAccess(origin, deptime, destination_list, destTTPrev, writer_cos
     # Iterate through the destinations and their respective TTs.
     for dest, totalTT_tup in zip(destination_list, destTTPrev):
         # Only assign jobs where destination can be reached
-        #totalTT_tup[0] is travel time, while tup[1] is auto cost
+        #totalTT_tup[0] is travel time, while tup[1] is auto cost, tup[2] is PNR
         if totalTT_tup[0] < 2147483647:
             time_cost = totalTT_tup[0] * VOT/3600 #If VOT = 0, then VOT is not added to total cost
             a_t_cost = totalTT_tup[1] + int(FARE) + time_cost
@@ -380,6 +380,8 @@ if __name__ == '__main__':
         for deptime in deptimeList:
 
             # Initiate travel time list to destination set, start with max time then update with min.
+            # Updated version of matrix linker initializes this to be the prevailing transit tt.
+            # Need to compute transit OD min-by-min, aggregate to 15 min, then load to DB and index.
             destTTPrev = np.array([[2147483647, ]] * DEST_NUM)
 
             #Iteratively update destTTPrev with minimum travel times.
