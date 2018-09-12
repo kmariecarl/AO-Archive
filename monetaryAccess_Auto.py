@@ -75,14 +75,14 @@ def createTAZ2TAZ(origin_list, deptime_list):
 
             o2d[origin][deptime] = tt_array
 
-        mod.elapsedTime(start_time)
+    mod.elapsedTime(start_time)
     print('All origins have been added to o2d dictionary')
     return o2d
 
 def createJobsDict():
     print('Building Jobs Dict', time.time() - t0)
     jobs_dict = {}
-    query = """SELECT taz, sumc000
+    query = """SELECT taz, jobs
                FROM {}.{};"""
     cur.execute(query.format(SCHEMA, JOBS))
     jobs = cur.fetchall()
@@ -190,8 +190,6 @@ def calcMonetaryAccess(origin, deptime, destination_list, or_slice, writer_cost)
         if tt_cost_tup[0] < 2147483647:
             time_cost = tt_cost_tup[0] * VOT/3600 #If VOT = 0, then VOT is not added to total cost
             #Auto costs along path plus parking cost associated with destination + time costs
-            print(tt_cost_tup[1])
-            print(PARKING[dest])
             a_p_cost = tt_cost_tup[1] + PARKING[dest] + time_cost
 
             for cost in THRESHOLD_COST_LIST:
@@ -320,10 +318,18 @@ if __name__ == '__main__':
     THRESHOLD_LIST_MINUTE = [int(x/60) for x in THRESHOLD_LIST]
 
     #THRESHOLD_COST_LIST = [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400]
+    # THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
+
     THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
                            1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
                            1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
-                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
+                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200, 3250, 3300,
+                           3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
+                           4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
+                           4950, 5000]
 
     # Create pnr2d15 dict in memory
     O2D = createTAZ2TAZ(originList, deptimeList)

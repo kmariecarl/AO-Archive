@@ -38,7 +38,7 @@ if __name__ == '__main__':
     reader1 = mod.readInToDict(args.RAC_FILE_1)
     reader2 = mod.readInToDict(args.RAC_FILE_2)
 
-    output = {}
+
     for row in reader1:
 
         entry = {'GEOID10': row['h_geocode'], '{}'.format(args.FIELD): row['C000']}
