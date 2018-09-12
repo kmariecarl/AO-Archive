@@ -292,10 +292,10 @@ if __name__ == '__main__':
     parser.add_argument('-table2', '--TABLE2_NAME', required=True, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-jobstab', '--JOBS_TABLE_NAME', required=True, default=None)  #Table 2 in schema, i.e. jobs
     parser.add_argument('-costtab', '--PATH_COST_TABLE_NAME', required=True, default=None)  #Path cost table in schema, i.e. t2pnr_auto_cost
-    parser.add_argument('-lim', '--CALC_LIMIT', required=True, default=32400)  #Calculation cutoff, i.e. 32400 = 9:00 AM
+    parser.add_argument('-lim', '--CALC_LIMIT', required=True, default=32400)  #Calculation cutoff, i.e. 8:45 = 31500, 32400 = 9:00 AM
     parser.add_argument('-scen', '--SCENARIO', required=True, default=None)  #Cost scenario to calc access from, i.e. A, B, C
     parser.add_argument('-fare', '--FARE', required=True, default=325)  #Rush fare is $3.25 otherwise put $0.00 for other scenarios
-    parser.add_argument('-vot', '--VALUE_OF_TIME', required=True, default=1803)  #Value of time in cents, i.e. $18.03 based on USDOT
+    parser.add_argument('-vot', '--VALUE_OF_TIME', required=True, default=1803)  #Value of time in cents, i.e. $18.03 = 1803 based on USDOT
     parser.add_argument('-or', '--ORIGIN_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-pnr', '--PNR_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
     parser.add_argument('-dep', '--DEPTIME_LIST', required=False, default=None)  #Table 2 in schema, i.e. pnr2d15
@@ -359,10 +359,19 @@ if __name__ == '__main__':
 
     THRESHOLD_LIST_MINUTE = [int(x/60) for x in THRESHOLD_LIST]
 
+    #Use when not dealing with VOT
+    # THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
+    #Use with VOT scenarios
     THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
                            1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
                            1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
-                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
+                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200, 3250, 3300,
+                           3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
+                           4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
+                           4950, 5000]
 
     #Make jobs dict in memory
     JOBS = createJobsDict()
