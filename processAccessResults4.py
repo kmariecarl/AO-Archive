@@ -1,6 +1,8 @@
-# This program performs mathematical operations to calculate four forms of accessibility values per origin ID.
+# This program performs mathematical operations to calculate five forms of accessibility values per origin ID.
 # The program can compare a baseline accessibility file with a access file where perhaps not all origins are included from
 # the baseline so the processing assumes no change to that origin and assigns the value from the baseline.
+# The thresholds that are considered are taken from the change file so if there are fewer thresholds in the change dict,
+# the program will still work.
 
 #This program should be used after converting raw access output to averages using Average_transit_local.py
 
@@ -63,12 +65,8 @@ def cleanLabelList(list_base, list_change):
     return final_label_list
 
 
-
-
-
-
 # This function combines all calculated values for each label (different data structures used).
-def calcAccessValues(label_list, thrshld_list, base_dict, change_dict):
+def calcAccessValues(label_list, thrshld_list, base_dict, change_dict, bar):
     # This dictionary initiation structure allows to fill in by column name!
     output_dict = {}
     for label in label_list:
@@ -97,16 +95,19 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict):
             name2 = 'rwpct{}'.format(thrshld)
             name3 = 'rwbs{}'.format(thrshld)
             name4 = 'rwchg{}'.format(thrshld)
+            name5 = 'pctbs{}'.format(thrshld)
             # Find the raw and percent differences for the UNWEIGHTED accessibility values
-            column[name1] = rawDiff(label, thrshld, base_dict, change_dict)
+            column[name1], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
             column[name2] = pctDiff(column[name1], label, thrshld, base_dict)
             # Add a column for the raw_base and raw_change accessibility values calculated for each threshold
             column[name3], column[name4] = rawValues(label, thrshld, base_dict, change_dict)
+            bar.next()
     # The result is a nested dictionary. Each label has a column name: calculated accessibility value.
     # Now make nested dict into list of dictionaries.
     list_of_dicts = []
     for key in output_dict.keys():
         list_of_dicts.append(output_dict[key])
+    bar.finish()
     return list_of_dicts
 
 
@@ -143,7 +144,12 @@ def rawPctWeightAccess(label, base_acs_wt, change_acs_wt):
 # These two functions are applied to the UNWEIGHTED accessibility values
 def rawDiff(label, thrshld, base_dict, chg_dict):
     diff = round(chg_dict[thrshld][label] - base_dict[thrshld][label], 3)
-    return diff
+    # add a new output column for access of update mode as a percent of base mode
+    if int(base_dict[thrshld][label]) != 0:
+        pctbs = round((chg_dict[thrshld][label]/base_dict[thrshld][label])*100, 3)
+    else:
+        pctbs = 0
+    return diff, pctbs
 
 # This function was added to simply put the raw base and change values for each block in the new dataset. This was
 # not originally part of this program but was greatly needed.
@@ -157,6 +163,7 @@ def pctDiff(diff, label, thrshld, base_dict):
     if int(base_dict[thrshld][label]) != 0:
         #Need to multiply by 100 to get percent right for plotting in QGIS and Tilemill
         pct = round((diff / int(base_dict[thrshld][label]))*100, 6)
+
     # If the base accessibility is zero, pct is undefined
     else:
         pct = 0  # "Not Defined"
@@ -171,6 +178,7 @@ def output(final_results, thrshld_list):
         for thrshld in thrshld_list:
             fieldnames.append('rwdf{}'.format(str(thrshld)))
             fieldnames.append('rwpct{}'.format(str(thrshld)))
+            fieldnames.append('pctbs{}'.format(str(thrshld)))
             fieldnames.append('rwbs{}'.format(str(thrshld)))
             fieldnames.append('rwchg{}'.format(str(thrshld)))
         writer = csv.DictWriter(outfile, fieldnames=fieldnames, delimiter=',')
@@ -191,14 +199,17 @@ import os
 import datetime
 import argparse
 import numpy as np
+from myToolsPackage.progress import bar
 
 
 if __name__ == "__main__":
 
+    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=972000) #54000 origins x 18 thresholds
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-bs', '--BASE_FILE', required=True, default=None)
     parser.add_argument('-updt', '--UPDATE_FILE', required=True, default=None)
-    parser.add_argument('-access', '--ACCESS_FIELD', required=True, default=None) #i.e. jobs or C000
+    parser.add_argument('-access', '--ACCESS_FIELD', required=True, default=None) #i.e. jobs or C000 or jobspdol
     args = parser.parse_args()
 
     currentTime = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
@@ -208,5 +219,5 @@ if __name__ == "__main__":
     labellist_change = makeLabelList(changeDict)
     labellist = cleanLabelList(labellist_base, labellist_change)
     thrshldlist = makeThrshldList(changeDict)
-    final_results = calcAccessValues(labellist, thrshldlist, baseDict, changeDict)
+    final_results = calcAccessValues(labellist, thrshldlist, baseDict, changeDict, bar)
     output(final_results, thrshldlist)
