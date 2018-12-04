@@ -113,10 +113,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--results_directory', required=True, default=None)
     parser.add_argument('-o', '--output_dir', required=True, default=None)
-    parser.add_argument('-label', '--JOBS_LABEL', required=True, default=None)
+    parser.add_argument('-access', '--ACCESS_LABEL', required=True, default=None) #i.e. jobs or C000
     args = parser.parse_args()
 
-    JOBS_LABEL = args.JOBS_LABEL
+    JOBS_LABEL = args.ACCESS_LABEL
 
     t = Timer()
     process(args.results_directory, args.output_dir)
