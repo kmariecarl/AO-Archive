@@ -27,8 +27,9 @@ if __name__ == '__main__':
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
-    parser.add_argument('-bs', '--BASE_FILE', required=True, default=None)  #ENTER AS full file path to path_analyst file
-    parser.add_argument('-updt', '--UPDATE_FILE', required=True, default=None)  #ENTER AS full file path to path_analyst file
+    parser.add_argument('-bs', '--BASE_FILE', required=True, default=None)  #Auto file
+    parser.add_argument('-updt', '--UPDATE_FILE', required=True, default=None)  #other mode file
+    parser.add_argument('-access', '--ACCESS_FIELD', required=True, default=None)  #i.e. jobspdol or jobs
     parser.add_argument('-field', '--FIELD', required=True, default=None)  #output field name i.e. pctauto
     parser.add_argument('-mode', '--COMPARE_MODE', required=True, default=None)  #PNR or Transit
     args = parser.parse_args()
@@ -39,10 +40,11 @@ if __name__ == '__main__':
 
     reader_auto = mod.readInToDict(args.BASE_FILE)
     reader_mode = mod.readInToDict(args.UPDATE_FILE)
+    access = args.ACCESS_FIELD
 
     for i,j in zip(reader_auto, reader_mode):
-        if int(i['jobs']) != 0:
-            pctAuto = (int(j['jobs']) / int(i['jobs'])) * 100
+        if int(i['{}'.format(access)]) != 0:
+            pctAuto = (int(j['{}'.format(access)]) / int(i['{}'.format(access)])) * 100
             entry = {'label': i['label'], 'threshold': i['threshold'], '{}'.format(args.FIELD): round(pctAuto, 4)}
             writer.writerow(entry)
             bar.next()
