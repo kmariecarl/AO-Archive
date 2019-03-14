@@ -1,5 +1,11 @@
+#THIS SCRIPT WAS ORIGINALLY CREATED FOR THE PNR ACCESSIBILITY PROCESS BUT WAS ABANDONED DUE TO THE CALCULATION TIME.
+
+#REFER TO createMinTT.py 
+
 #This script reads in a succession of travel time files that are broken up by departure time and origin and need to be
 #aggregated up to 15 minute bins and where the 15th percentile is applied.
+
+#Output: Series of files separated by origin and deptime and only contain the 15th percentile travel time for each 15 min bin
 
 #EXAMPLE USAGE: kristincarlson$ python createPercentileTT.py -pnr 'PNRList_origin.txt' -or_dep 'Deptimes_origin.txt
 #-dest_dep 'Deptimes_destination.txt' -od 'destination'
