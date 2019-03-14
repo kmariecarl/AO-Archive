@@ -1,4 +1,5 @@
-#This script adds the RACC000 fields of different states to produce one RACC000 field. Can also be used for WACC000
+#This script essentially concatenates the LEHD files from different states on RAC_C000 or WAC_C000 data
+#and outputs the GEOID10 with a wac or rac field for each state.
 
 #################################
 #           IMPORTS             #
@@ -8,10 +9,6 @@ from myToolsPackage import matrixLinkModule as mod
 import argparse
 import time
 from myToolsPackage.progress import bar
-
-#################################
-#           FUNCTIONS           #
-#################################
 
 #################################
 #           OPERATIONS          #
