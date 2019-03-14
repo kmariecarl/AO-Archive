@@ -1,5 +1,6 @@
 #This script loads in the averaged accessibility results for transit + walk and averaged walk calculations and does a row-wise
-#subtraction to get the net transit accessibility. The program structure relies on the origin set and thresholds all matching!
+#subtraction to get the net transit accessibility. The program structure relies on the origin set and thresholds all matching.
+#If labels and thresholds do not match, an error will be thrown.
 
 
 #################################
@@ -15,9 +16,14 @@ import time
 #################################
 def calcNet(tw, w):
     for row_tw, row_w in zip(tw, w):
-        dif = int(row_tw['jobs']) -int(row_w['jobs'])
-        entry = {'label': row_tw['label'], 'threshold': row_tw['threshold'], 'jobs': dif}
-        writer.writerow(entry)
+        try:
+            if row_tw['label'] == row_w['label'] and row_tw['threshold'] == row_w['threshold']:
+                dif = int(row_tw['jobs']) -int(row_w['jobs'])
+                entry = {'label': row_tw['label'], 'threshold': row_tw['threshold'], 'jobs': dif}
+                writer.writerow(entry)
+        except:
+            print('Uh oh, labels or thresholds do not line up between files')
+
 
 
 
