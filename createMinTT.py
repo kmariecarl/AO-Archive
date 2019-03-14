@@ -1,10 +1,10 @@
 #This script reads in a sequence of travel time matrix files that have been "split" then rejoined into files broken
-# up by PNR and deptime.
+# up by PNR and deptime to find the minimum TT in each 15 minute window.
 
 #Process:
 #In each 15 minute window across the tt matrix, the minimum travel time is kept.
 #The final result is a minimum travel time matrix aggregated to the 15 minute level
-#The program assumes that the orginal TT matrix was calculate without retaining unreachable destinations. Thus no maxtime
+#The program assumes that the original TT matrix was calculated without retaining unreachable destinations (0.2.2). Thus no maxtime
 #value is listed.
 
 #Navigate to folder or create new folder where you want all of these PNR_min time files to be located
@@ -126,3 +126,4 @@ if __name__ == '__main__':
         print("Minimum file created for PNR {}".format(pnr_select))
         bar.finish()
         print('-----------------------------')
+        print("End Time:", time.time())
