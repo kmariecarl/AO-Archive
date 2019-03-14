@@ -1,10 +1,22 @@
+#This program is used to extract accessibility results for a set of user specified labels. This program is generally used
+#to make a plot of accessibility versus departure time for transit but can be used in other contexts to look at label specific
+#accessibility taken from the raw accessibility results
+
+#INPUT:
+#1. baseline raw accessibility
+#2. scenario raw accessibility
+
+#OUTPUT:
+#Two .csv files with label specific accessibility for the baseline and scenario
+
 #Example use case:
 
 #~krist> python blockAccessExtractor.py -bsaccess base_accessibility_file.csv -updateaccess update_accessibility_file.csv
 
 #This program should be placed in the folder where the .csv files reside.
 
-#Input for blocks should look like this:
+#Input for labels should look like this:
+#enter like 270530234002015 271230425012030 270530240033002
 
 ####################################
 ## Libraries and global variables ##
@@ -17,9 +29,10 @@ import time
 import argparse
 from myToolsPackage.progress import bar
 
+####################################
+## FUNCTIONS
+####################################
 
-
-#blockID = [270030507042007, 270531097002008, 270531261003037, 270530220002002, 271230333001014]
 #Read in the file of the baseline and updated min-by-min accessibility.
 def makeAccessOutput(access_file, list, bar, filename):
     access_list = csv.reader(access_file, delimiter=',')
@@ -46,8 +59,7 @@ if __name__ == "__main__":
     currentTime = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
     #Progress bar
     bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=351864000) #54000 origins x 18 thresholds x 181 departure times x 2 files, 1.78 hours run time
-    # Parameterize file paths: use argparse so that when blockAccessExtractor is run, the user adds additional arguments for the
-    # necesarry file paths.
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-bsaccess', '--BASE_ACCESS', required=True, default=None)
     parser.add_argument('-updateaccess', '--UPDATE_ACCESS', required=True, default=None)
@@ -61,17 +73,14 @@ if __name__ == "__main__":
     for i in list:
         blockID.append(int(i))
     print('Block IDs', blockID)
-    #blockID = [int(x) for x in input('Comma separated list of labels w or without brackets?').split()]
-    # print("Your input")
-    # print(blockID)
 
     #Produces a new file where the "labels" or blockIDs that match the input above are extracted from the baseline
     #accessibility calc file for the given scenario.
-    with open(os.path.join(args.BASE_ACCESS)) as base_file: #, newline=''
+    with open(os.path.join(args.BASE_ACCESS)) as base_file:
         makeAccessOutput(base_file, blockID, bar, "base")
         print("Baseline accessibility for select block groups")
     #Produces a new file with accessibility calcs extracted for the comparable blocks examined in the baseline extract.
-    with open(os.path.join(args.UPDATE_ACCESS)) as update_file: #, newline=''
+    with open(os.path.join(args.UPDATE_ACCESS)) as update_file:
         makeAccessOutput(update_file, blockID, bar, "update")
         print("Changed accessibility for select block groups")
         bar.finish()
