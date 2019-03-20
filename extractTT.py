@@ -1,33 +1,23 @@
-#This script reads in a csv of rows to be extracted from the larger TT matrix file then writes the rows out
-#to a subset file.
+#This script reads in a csv containing multiple fields of rows to be extracted from the larger TT matrix file
+# then writes the rows out to a subset file.
 
 
 #################################
 #           IMPORTS             #
 #################################
-import csv
-import datetime
-import time
+
 import argparse
-from createString import makeDict
+from myToolsPackage import matrixLinkModule as mod
+from progress import bar
 
 
 #################################
 #           FUNCTIONS           #
 #################################
 
-def startTimer():
-    # Start timing
-    start_time = time.time()
-    # Make a variable for the current time for use in writing files.
-    currentTime = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-    return currentTime
 
-def mkOutput(currentTime, fieldnames):
-    outfile = open('output_{}.txt'.format(curtime), 'w')  # , newline=''
-    writer = csv.DictWriter(outfile, fieldnames=fieldnames)  # , quotechar = "'"
-    writer.writeheader()
-    return writer
+
+
 #################################
 #           OPERATIONS          #
 #################################
@@ -35,23 +25,28 @@ def mkOutput(currentTime, fieldnames):
 
 if __name__ == '__main__':
 
-    curtime = startTimer()
+    curtime = mod.startTimer()
     # Parameterize file paths
     parser = argparse.ArgumentParser()
     parser.add_argument('-tt', '--TTMATRIX_FILE', required=True, default=None)
-    parser.add_argument('-set', '--SELECTFROM_FILE', required=True, default=None)
+    parser.add_argument('-tt_row_count', '--TTMATRIX_SIZE', required=True, default=None) #give the approximate number of rows
+    parser.add_argument('-set', '--SELECT_FROM_FILE', required=True, default=None)
+    parser.add_argument('-id', '--ID_FIELD', required=True, default=None) #Give the origin id field name ex. label, origin, PnRNumInt
     args = parser.parse_args()
 
     fieldnames = ['origin', 'destination', 'deptime', 'traveltime']
-    writer = mkOutput(curtime, fieldnames)
+    writer = mod.mkOutput('ttextract', fieldnames, curtime)
 
-    ttmatrix_dict = makeDict(args.TTMATRIX_FILE)
-    pnr_dict = makeDict(args.SELECTFROM_FILE)
+    bar = bar.Bar(message='Processing', fill='@', suffix='%(percent)d%%', max=int(args.TTMATRIX_SIZE)) #Adjust
+    ttmatrix_dict = mod.readInToDict(args.TTMATRIX_FILE)
+    id_dict = mod.readInToDict(args.SELECT_FROM_FILE)
 
     for rowTT in ttmatrix_dict:
-        for rowPNR in pnr_dict:
+        bar.next()
+        for rowID in id_dict:
             print('thinking.....')
-            if int(rowTT['destination']) == int(rowPNR['PnRNumInt']):
+            if int(rowTT['destination']) == int(rowID['{}'.format(args.ID_FIELD)]):
                 writer.writerow(rowTT)
                 print('writing')
+    bar.finish()
 
