@@ -7,8 +7,12 @@
 #This program should be used after converting raw access output to averages using Average_transit_local.py
 
 # TO DO:
-# Implement argparser for the user to input the names of the two input files.
-# Auto populate threshold list. Figure out how to read first line of input files to create iterator for dictionary creation.
+#Clean up internal variable names to match naming convention of write out.
+
+#Updates 5/8/19
+#Output naming convention changed and percent change values are now reported in decimals, example below
+#Ex. Percent change of 10% used to be 10.0 but now is reported as 0.10
+
 
 # --------------------------
 #       FUNCTIONS
@@ -54,6 +58,7 @@ def makeLabelList(data_dict):
     # print('Label list:', label_list)
     return label_list
 
+
 #This function confirms that labels from both the base and change results are the same. If one file has a value for a
 #label and the other doesn't, that label will be skipped.
 def cleanLabelList(list_base, list_change):
@@ -87,20 +92,20 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict, bar):
             # Obtain the weighted accessibility values for the baseline and changed files, and print out
             base_access_wt = calcWeightedAccess(label, label_list, thrshld_list, base_dict)
             chg_access_wt = calcWeightedAccess(label, label_list, thrshld_list, change_dict)
-            column['wt_bs'], column['wt_chg'] = base_access_wt, chg_access_wt
+            column['wt_bs'], column['wt_alt'] = base_access_wt, chg_access_wt
             # Calculate the raw (as in the abs difference) and percent change between the WEIGHTED accessibility values
-            column['wt_raw_chg'], column['wt_pct_chg'] = rawPctWeightAccess(label, base_access_wt, chg_access_wt)
+            column['abschgtmwt'], column['pctchgtmwt'] = rawPctWeightAccess(label, base_access_wt, chg_access_wt)
             # Iteratively make names for columns
-            name1 = 'rwdf{}'.format(thrshld)
-            name2 = 'rwpct{}'.format(thrshld)
-            name3 = 'rwbs{}'.format(thrshld)
-            name4 = 'rwchg{}'.format(thrshld)
+            name1 = 'bs_{}'.format(thrshld)
+            name2 = 'alt_{}'.format(thrshld)
+            name3 = 'abschg{}'.format(thrshld)
+            name4 = 'pctchg{}'.format(thrshld)
             name5 = 'pctbs{}'.format(thrshld)
             # Find the raw and percent differences for the UNWEIGHTED accessibility values
-            column[name1], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
-            column[name2] = pctDiff(column[name1], label, thrshld, base_dict)
+            column[name3], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
+            column[name4] = pctDiff(column[name1], label, thrshld, base_dict)
             # Add a column for the raw_base and raw_change accessibility values calculated for each threshold
-            column[name3], column[name4] = rawValues(label, thrshld, base_dict, change_dict)
+            column[name1], column[name2] = rawValues(label, thrshld, base_dict, change_dict)
             bar.next()
     # The result is a nested dictionary. Each label has a column name: calculated accessibility value.
     # Now make nested dict into list of dictionaries.
@@ -137,7 +142,8 @@ def rawPctWeightAccess(label, base_acs_wt, change_acs_wt):
     if base_acs_wt == 0:
         pct = 0  # 'Not Defined'
     else:
-        pct = round((diff / float(base_acs_wt))*100, 6)
+        pct = round((diff / float(base_acs_wt)), 6)
+        #Old: pct = round((diff / float(base_acs_wt))*100, 6)
     return diff, pct
 
 
@@ -161,9 +167,8 @@ def rawValues(label, thrshld, base_dict, chg_dict):
 
 def pctDiff(diff, label, thrshld, base_dict):
     if int(base_dict[thrshld][label]) != 0:
-        #Need to multiply by 100 to get percent right for plotting in QGIS and Tilemill
         pct = round((diff / int(base_dict[thrshld][label]))*100, 6)
-
+        #Old: pct = round((diff / int(base_dict[thrshld][label]))*100, 6)
     # If the base accessibility is zero, pct is undefined
     else:
         pct = 0  # "Not Defined"
@@ -174,13 +179,13 @@ def pctDiff(diff, label, thrshld, base_dict):
 def output(final_results, thrshld_list):
     with open('processed_results_{}.csv'.format(currentTime), 'w') as outfile:
         # Create fieldnames list iteratively to eliminate user input.
-        fieldnames = ['label', 'wt_bs', 'wt_chg', 'wt_raw_chg', 'wt_pct_chg']
+        fieldnames = ['label', 'wt_bs', 'wt_alt', 'abschgtmwt', 'pctchgtmwt']
         for thrshld in thrshld_list:
-            fieldnames.append('rwdf{}'.format(str(thrshld)))
-            fieldnames.append('rwpct{}'.format(str(thrshld)))
+            fieldnames.append('bs_{}'.format(str(thrshld)))
+            fieldnames.append('alt_{}'.format(str(thrshld)))
+            fieldnames.append('abschg{}'.format(str(thrshld)))
+            fieldnames.append('pctchg{}'.format(str(thrshld)))
             fieldnames.append('pctbs{}'.format(str(thrshld)))
-            fieldnames.append('rwbs{}'.format(str(thrshld)))
-            fieldnames.append('rwchg{}'.format(str(thrshld)))
         writer = csv.DictWriter(outfile, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()
         for label in final_results:
