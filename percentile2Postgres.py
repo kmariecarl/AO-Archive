@@ -41,17 +41,17 @@ def addDeptimeSec():
 
 def createIndex():
     print('Creating index on origin')
-    query1 = "CREATE INDEX origin_pnr2dmin ON {}.{} (origin);"
-    cur.execute(query1.format(SCHEMA, TABLE3))
+    query1 = "CREATE INDEX origin_{} ON {}.{} (origin);"
+    cur.execute(query1.format(TABLE3, SCHEMA, TABLE3))
 
-    query2 =  "CREATE INDEX deptime_sec_pnr2dmin ON {}.{} (deptime_sec);"
-    cur.execute(query2.format(SCHEMA, TABLE3))
-    print(cur.mogrify(query2.format(SCHEMA, TABLE3)))
+    query2 =  "CREATE INDEX deptime_sec_{} ON {}.{} (deptime_sec);"
+    cur.execute(query2.format(TABLE3 ,SCHEMA, TABLE3))
+    print(cur.mogrify(query2.format(TABLE3 ,SCHEMA, TABLE3)))
     print('Index deptime_sec_pnr2dmin added to table {}'.format(TABLE3))
 
-    query3 =  "CREATE INDEX destination_sec_pnr2dmin ON {}.{} (destination);"
-    cur.execute(query3.format(SCHEMA, TABLE3))
-    print(cur.mogrify(query3.format(SCHEMA, TABLE3)))
+    query3 =  "CREATE INDEX destination_sec_{} ON {}.{} (destination);"
+    cur.execute(query3.format(TABLE3, SCHEMA, TABLE3))
+    print(cur.mogrify(query3.format(TABLE3, SCHEMA, TABLE3)))
     print('Index deptime_sec_pnr2dmin added to table {}'.format(TABLE3))
 
 
