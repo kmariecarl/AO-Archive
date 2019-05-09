@@ -10,15 +10,14 @@
 #2. Determine if the PNR has been visited before, if not, add to dictionary
 #3. Determine if the destination has been visited for that PNR before, if not, add to value list in dictionary.
 #4. If both PNR and Deptime have been visited, does a new file need to be opened?
-#5. Else, write current row to currently open writer object.
+#5. Else, write current row to currently open writer object. 
 #6. Compare the finalized list of PNRs with the externally provided list of PNRs to make sure that all were visited.
 
 #TT files come in with following header:
 #origin,destination,deptime,traveltime
 
 
-# EXAMPLE USAGE: kristincarlson$ python matrixBreaker.py -pnrlist PNRList_xxx.txt, -deplist Deptimes_dest_xxx.txt
-# -split ./UnitTest_Split/
+# EXAMPLE USAGE: kristincarlson$ python matrixBreaker.py -pnr origin -pnrlist PNRList_xxx.txt -split ./UnitTest_Split/
 
 #################################
 #           IMPORTS             #
@@ -80,17 +79,22 @@ def processSplit(location):
                     #Check if a file has already been started for this pnr + deptime combo, but only check on first line
                     if int(row[location]) in PNR_2_DEPTIME_DICT and row[2] in PNR_2_DEPTIME_DICT[int(row[location])] and count == 0:
                         #open previous file
-                        reopen = open('PNR_{}_{}.txt'.format(row[location], row[2]), 'a')
+                        reopen = open('PNR_{}_{}.csv'.format(row[location], row[2]), 'a')
                         writer = csv.writer(reopen)
                         set_pnr = row[location]
                         set_deptime = row[2]
                         writer.writerow(row)
+                        # reopen.close()
 
                     else:
                         #Continue adding rows to either the new file created above, or the reopend file.
                         if row[location] == set_pnr:
                             if row[2] == set_deptime:
+                                # # open previous file
+                                # reopen = open('PNR_{}_{}.csv'.format(row[location], row[2]), 'a')
+                                # writer = csv.writer(reopen)
                                 writer.writerow(row)
+                                # reopen.close()
                 count += 1
 
         print("Split file {} has been processed".format(name))
