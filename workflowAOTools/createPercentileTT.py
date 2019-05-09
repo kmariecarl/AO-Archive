@@ -1,6 +1,6 @@
 #THIS SCRIPT WAS ORIGINALLY CREATED FOR THE PNR ACCESSIBILITY PROCESS BUT WAS ABANDONED DUE TO THE CALCULATION TIME.
 
-#REFER TO createMinTT.py 
+#REFER TO createMinTT.py
 
 #This script reads in a succession of travel time files that are broken up by departure time and origin and need to be
 #aggregated up to 15 minute bins and where the 15th percentile is applied.
