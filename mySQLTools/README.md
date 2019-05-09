@@ -1,0 +1,1 @@
+This subfolder of my git repo contains SQL scripts that were created mainly for Task 5 of the Bus-Highway project. These tools may be applicable in the shared mobility software development, so keep on hand.
