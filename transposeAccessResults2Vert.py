@@ -10,25 +10,26 @@ import time
 from myToolsPackage import matrixLinkModule as mod
 from collections import OrderedDict
 from myToolsPackage.progress import bar
+import math
 
 # --------------------------
 #       FUNCTIONS
 # --------------------------
-def createInternalDict(input_file, bar):
+def createInternalDict(input_file, id, bar):
     transpose_dict = OrderedDict()
 
     counter = 0
-    for row in input:
+    for row in input_file:
         if counter == 0:
             threshold_list = createThresholdList(row)
 
-        transpose_dict[row['label']] = OrderedDict()
+        transpose_dict[row['{}'.format(id)]] = OrderedDict()
         for thresh in threshold_list:
-            if row[thresh] is '':
+            if math.isnan(float(row[thresh])) is True:
                 value = 0
             else:
                 value = row[thresh]
-            transpose_dict[row['label']][thresh] = value
+            transpose_dict[row['{}'.format(id)]][thresh] = int(float(value))
 
         counter += 1
         bar.next()
@@ -88,7 +89,7 @@ if __name__ == "__main__":
 
     fieldnames = ['label', 'threshold', 'jobs']
 
-    transposeDict = createInternalDict(input, bar)
+    transposeDict = createInternalDict(input, ID, bar)
     write2File(transposeDict, fieldnames)
 
 
