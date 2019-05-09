@@ -15,16 +15,13 @@ import datetime
 import os
 import time
 import argparse
+from myToolsPackage import matrixLinkModule as mod
 
 #################################
 #           FUNCTIONS           #
 #################################
 
-#Make a dictReader object from input file
-def makeDict(file):
-    input = open(file, 'r')
-    reader = csv.DictReader(input)
-    return reader
+
 #Make a list of strings from a single column of input file
 def makeList(dictionary, field):
     outputList = []
@@ -56,7 +53,7 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     #Main operations
-    dictionary = makeDict(args.CSV_FILE)
+    dictionary = (args.CSV_FILE)
     outputList = makeList(dictionary, args.FIELD)
     writeOutput(outputList)
 
