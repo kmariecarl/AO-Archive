@@ -1,17 +1,23 @@
 #This script is a new version of monetaryAccess_PNR.py that uses the pnr2dmin TT matrix as opposed to the old pnr2d15 matrix.
 
-#This script reads in TAZ2PNR and PNR2DMin tables from PostGres DB and connects all viable paths then calculated the monetary
-# and time based accessibility.
+#This script reads in TAZ2PNR and PNR2DMin tables from PostGres DB and connects all viable paths then calculates the
+#time-based and time+cost based accessibility
+
+#example usage: kristincarlson~ python ~/Dropbox/Bus-Highway/Programs/gitPrograms/monetaryAccess_PNR_minTT.py -db TTMatrixLink
+# -schema ttmatrices -table1 o2pnr -table2 pnr2dmin -jobstab jobs -costtab t2pnr_auto_cost -lim 31500 -scen d -fare 325 -vot 0
+
+#Cost scenarios to choose from:
+# suma = sumfuel + sumrep + sumdep + FIXED
+# sumb = sumfuel + sumrep + sumdep + FIXED + sumvot
+# sumc = sumirs
+# sumd = sumfuel + sumrep + sumdep
+# sume = sumfuel + sumrep + sumdep + sumvot
 
 #Notes:
 #All costs listed in cents. ie. $4.00 listed as 400
 #I have tried many times to incorporate a PNR counter but numpy arrays do not support the operations I have tried
 #The transfer penalty is a min of 0 minutes and max of 15 minutes. Results from the depsumBin operation and aggregating
 #transit tt's to lower bin, max spread is 15 units
-
-#############
-#These pieces were commented out because they are artifacts of the previous maxtime operations
-############
 
 
 
@@ -360,18 +366,18 @@ if __name__ == '__main__':
     THRESHOLD_LIST_MINUTE = [int(x/60) for x in THRESHOLD_LIST]
 
     #Use when not dealing with VOT
-    # THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
-    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
-    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
-    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
-    #Use with VOT scenarios
     THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
                            1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
                            1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
-                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200, 3250, 3300,
-                           3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
-                           4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
-                           4950, 5000]
+                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
+    #Use with VOT scenarios
+    # THRESHOLD_COST_LIST = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200, 3250, 3300,
+    #                        3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
+    #                        4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
+    #                        4950, 5000]
 
     #Make jobs dict in memory
     JOBS = createJobsDict()
