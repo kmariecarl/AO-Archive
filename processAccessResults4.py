@@ -107,7 +107,7 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict, bar):
             # Find the raw and percent differences for the UNWEIGHTED accessibility values
             column[name3], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
 
-            column[name4] = pctDiff(column[name1], label, thrshld, base_dict)
+            column[name4] = pctDiff(column[name3], label, thrshld, base_dict)
 
             bar.next()
     # The result is a nested dictionary. Each label has a column name: calculated accessibility value.
@@ -170,7 +170,7 @@ def rawValues(label, thrshld, base_dict, chg_dict):
 
 def pctDiff(diff, label, thrshld, base_dict):
     if int(base_dict[thrshld][label]) != 0:
-        pct = round((diff / int(base_dict[thrshld][label]))*100, 6)
+        pct = round((diff / int(base_dict[thrshld][label])), 6)
         #Old: pct = round((diff / int(base_dict[thrshld][label]))*100, 6)
     # If the base accessibility is zero, pct is undefined
     else:
