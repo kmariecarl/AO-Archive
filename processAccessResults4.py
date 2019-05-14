@@ -101,11 +101,14 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict, bar):
             name3 = 'abschg{}'.format(thrshld)
             name4 = 'pctchg{}'.format(thrshld)
             name5 = 'pctbs{}'.format(thrshld)
-            # Find the raw and percent differences for the UNWEIGHTED accessibility values
-            column[name3], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
-            column[name4] = pctDiff(column[name1], label, thrshld, base_dict)
+
             # Add a column for the raw_base and raw_change accessibility values calculated for each threshold
             column[name1], column[name2] = rawValues(label, thrshld, base_dict, change_dict)
+            # Find the raw and percent differences for the UNWEIGHTED accessibility values
+            column[name3], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
+
+            column[name4] = pctDiff(column[name1], label, thrshld, base_dict)
+
             bar.next()
     # The result is a nested dictionary. Each label has a column name: calculated accessibility value.
     # Now make nested dict into list of dictionaries.
@@ -204,7 +207,7 @@ import os
 import datetime
 import argparse
 import numpy as np
-from myToolsPackage.progress import bar
+from progress import bar
 
 
 if __name__ == "__main__":
