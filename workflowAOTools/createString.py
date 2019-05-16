@@ -15,7 +15,6 @@ import datetime
 import os
 import time
 import argparse
-from myToolsPackage import matrixLinkModule as mod
 
 #################################
 #           FUNCTIONS           #
