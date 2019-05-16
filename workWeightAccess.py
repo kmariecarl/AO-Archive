@@ -17,6 +17,7 @@ import csv
 from progress import bar
 
 from myToolsPackage import matrixLinkModule as mod
+from collections import defaultdict, OrderedDict
 
 # --------------------------
 #       FUNCTIONS
@@ -36,7 +37,18 @@ def main():
 
     #Read in files to dict (make into function)
     access_file = mod.readInToDict(args.ACCESS_FILE)
-    access_flds = list(access_file.fieldnames)
+    #access_flds = list(access_file.fieldnames)
+    access_flds = ['GEOID10','wt_bs','wt_alt','abschgtmwt','pctchgtmwt','bs_5400','alt_5400','abschg5400','pctchg5400',
+                   'pctbs5400','bs_5100','alt_5100','abschg5100','pctchg5100','pctbs5100','bs_4800','alt_4800','abschg4800',
+                   'pctchg4800','pctbs4800','bs_4500','alt_4500','abschg4500','pctchg4500','pctbs4500','bs_4200','alt_4200',
+                   'abschg4200','pctchg4200','pctbs4200','bs_3900','alt_3900','abschg3900','pctchg3900','pctbs3900','bs_3600',
+                   'alt_3600','abschg3600','pctchg3600','pctbs3600','bs_3300','alt_3300','abschg3300','pctchg3300','pctbs3300',
+                   'bs_3000','alt_3000','abschg3000','pctchg3000','pctbs3000','bs_2700','alt_2700','abschg2700','pctchg2700',
+                   'pctbs2700','bs_2400','alt_2400','abschg2400','pctchg2400','pctbs2400','bs_2100','alt_2100','abschg2100',
+                   'pctchg2100','pctbs2100','bs_1800','alt_1800','abschg1800','pctchg1800','pctbs1800','bs_1500','alt_1500',
+                   'abschg1500','pctchg1500','pctbs1500','bs_1200','alt_1200','abschg1200','pctchg1200','pctbs1200','bs_900','alt_900',
+                   'abschg900','pctchg900','pctbs900','bs_600','alt_600','abschg600','pctchg600','pctbs600','bs_300','alt_300',
+                   'abschg300','pctchg300','pctbs300']
     print("Accessibility fields to choose from:", access_flds)
     print('----------------------------------')
     rac_file = mod.readInToDict(args.RAC_FILE)
@@ -45,9 +57,9 @@ def main():
 
     if '-group' in sys.argv:
         mapFile = mod.readInToDict(args.MAP_FIlE)
-        print('fields from map file', mapFile.fieldnames)
-        map_lab = input('Type the field of the map label: ') or 'GEOID10'
-        group_id = input('type the field of the group id (i.e. GNIS_ID) ') or 'GNIS_ID'
+        print('fields from file that maps GEOID10 to City (GNIS_ID)', mapFile.fieldnames)
+        map_lab = input('Type the master field of the map label (GEOID10): ') or 'GEOID10'
+        group_id = input('Type the field of the group id (i.e. GNIS_ID) ') or 'GNIS_ID'
 
     #Prompt user for field names
     orlab = input('Type the name of the field that corresponds with the accessibility file row labels, i.e. TAZ, label, ID ') or 'label'
@@ -97,7 +109,6 @@ def makeMapDict(map_file, map_lab, group_id ):
             map[int(row['{}'.format(map_lab)])] = int(row['{}'.format(group_id)])
         else:
             origins_missing_GNIS_ID.append(int(row['{}'.format(map_lab)]))
-            print(row['{}'.format(map_lab)])
     return map, origins_missing_GNIS_ID
 
 #Option 1 no flag
@@ -129,7 +140,7 @@ def groupWWAccess(access_dict, rac_dict, access_flds, curtime, map, group_id, mi
     bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=iter)
     #for each unique id, perform the ww calculations
     for id in unique:
-        output_dict[id] = {}
+        output_dict[id] = OrderedDict()
         print('Find origins that belong in the {} aggregation (city)'.format(id))
         #create a subset of access_dict with only the origins that match the unique_id
         origin_subset = []
@@ -157,7 +168,9 @@ def groupWWAccess(access_dict, rac_dict, access_flds, curtime, map, group_id, mi
                 print('This city has no workers?',id)
                 weighted_avg = 'NA'
             output_dict[id]['{}'.format(field)] = weighted_avg
-            row = id, field, output_dict[id]['{}'.format(field)]
+
+            #row = id, field, output_dict[id]['{}'.format(field)]
+            row = id, field, weighted_avg
             writer.writerow(row)
         bar.next()
     print('Grouped WW Accessibility Results Finished')
@@ -190,32 +203,34 @@ def lineUpLists(access_dict, rac_dict, access_field):
     miss = []
     for i in access_dict:
         origin = int(i)
+        #Check for waterbody blocks
+        if int(origin) in access_dict.keys() and int(origin) in rac_dict.keys():
 
-        #account for missing accessibility value
-        if access_dict[origin][access_field] is '' and rac_dict[origin] is '':
-            access_list.append(0)
-            worker_list.append(0)
+            #account for missing accessibility value
+            if access_dict[origin][access_field] is '' and rac_dict[origin] is '':
+                access_list.append(0)
+                worker_list.append(0)
 
-        elif access_dict[origin][access_field] is '':
-            access_list.append(0)
-            worker_list.append(int(rac_dict[origin]))
+            elif access_dict[origin][access_field] is '':
+                access_list.append(0)
+                worker_list.append(int(rac_dict[origin]))
 
-        #Account for blocks that do not have RAC value (no worker population)
-        elif int(origin) not in rac_dict.keys():
-            access_list.append(float(access_dict[origin][access_field]))
-            worker_list.append(0)
-            no_rac_count += 1
-            miss.append(origin)
+            #Account for blocks that do not have RAC value (no worker population)
+            elif int(origin) not in rac_dict.keys():
+                access_list.append(float(access_dict[origin][access_field]))
+                worker_list.append(0)
+                no_rac_count += 1
+                miss.append(origin)
 
 
-        elif rac_dict[origin] is '':
-            access_list.append(float(access_dict[origin][access_field]))
-            worker_list.append(0)
-            no_rac_count += 1
+            elif rac_dict[origin] is '':
+                access_list.append(float(access_dict[origin][access_field]))
+                worker_list.append(0)
+                no_rac_count += 1
 
-        else:
-            access_list.append(float(access_dict[origin][access_field]))
-            worker_list.append(int(rac_dict[origin]))
+            else:
+                access_list.append(float(access_dict[origin][access_field]))
+                worker_list.append(int(rac_dict[origin]))
 
     assert len(access_list) == len(worker_list), "The access_list and worker_list are not of equal length"
 
