@@ -9,6 +9,10 @@
 #           IMPORTS             #
 #################################
 
+#################################
+#           IMPORTS             #
+#################################
+
 import csv
 
 
@@ -16,7 +20,6 @@ from myToolsPackage import matrixLinkModule as mod
 import argparse
 import time
 from myToolsPackage.progress import bar
-from collections import defaultdict, OrderedDict
 
 
 #################################
@@ -24,12 +27,13 @@ from collections import defaultdict, OrderedDict
 #################################
 def makeTripsList(file):
     with open(file) as csvfile1:
-        trips_file = csv.DictReader(csvfile1)
-        #read in trips to a string
+        trips_file = csv.reader(csvfile1)
+        # read in trips to a string
         trips_list = []
         for row in trips_file:
-            trips_list.append(str(row['trip_id']))
-        print("trip_list:", trips_list)
+            for item in row:
+                trips_list.append(str(item))
+        print("Number of trips in removal trip_list:", len(trips_list))
         return trips_list
 
 #################################
@@ -45,31 +49,37 @@ if __name__ == '__main__':
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
-    parser.add_argument('-trips', '--TRIPS_FILE', required=True, default=None)  #name of removed trips list
-    parser.add_argument('-stops', '--STOPS_FILE', required=True, default=None)  #name of stop_times file
-    parser.add_argument('-fname', '--OUTPUT_FILE_NAME', required=True, default=None)  #i.e. stop_times_revised.txt
+    parser.add_argument('-stop_times', '--STOP_TIMES_FILE', required=True, default=None)  #name of stop_times file
+    parser.add_argument('-trips_list', '--TRIPS_LIST_FILE', required=True, default=None)  #name of removed trips list
 
     args = parser.parse_args()
 
-    fieldnames = ['trip_id','arrival_time','departure_time','stop_id','stop_sequence','pickup_type','drop_off_type']
+    fieldnames = ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence', 'pickup_type', 'drop_off_type']
 
-    writer = mod.mkDictOutput('{}_{}'.format(args.OUTPUT_FILE_NAME, curtime), fieldname_list=fieldnames)
-
-
+    writer = mod.mkDictOutput('stop_times_reduced_{}'.format(curtime), fieldname_list=fieldnames)
 
 
-    tripsList = makeTripsList(args.TRIPS_FILE)
 
 
-    with open(args.STOPS_FILE) as csvfile2:
+    tripsList = makeTripsList(args.TRIPS_LIST_FILE)
+
+
+    with open(args.STOP_TIMES_FILE) as csvfile2:
         stops_file = csv.DictReader(csvfile2)
+        count1 = 0
+        count2 = 0
         for row in stops_file:
             trip = str(row['trip_id'])
             if trip not in tripsList:
-                entry = {'trip_id': row['trip_id'], 'arrival_time': row['arrival_time'],'departure_time':row['departure_time'],
-                         'stop_id':row['stop_id'],'stop_sequence':row['stop_sequence'],'pickup_type':row['pickup_type'],
-                         'drop_off_type':row['drop_off_type']}
+                entry = {'trip_id': row['trip_id'], 'arrival_time': row['arrival_time'], 'departure_time': row['departure_time'],
+                         'stop_id': row['stop_id'], 'stop_sequence': row['stop_sequence'], 'pickup_type': row['pickup_type'],
+                         'drop_off_type': row['drop_off_type']}
 
                 writer.writerow(entry)
+                count2 += 1
+            count1 += 1
             bar.next()
         bar.finish()
+        print('Number of rows in original stop times file: ', count1)
+        print('Number of rows in reduced stop times file: ', count2)
+        print('Difference in number of rows: ', count1 - count2)
