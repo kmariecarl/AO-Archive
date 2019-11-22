@@ -37,8 +37,10 @@ def main():
 
     #Read in files to dict (make into function)
     access_file = mod.readInToDict(args.ACCESS_FILE)
-    #access_flds = list(access_file.fieldnames)
-    access_flds = ['GEOID10','wt_bs','wt_alt','abschgtmwt','pctchgtmwt','bs_5400','alt_5400','abschg5400','pctchg5400',
+    access_flds_all = list(access_file.fieldnames)
+    print("Accessibility fields to choose from:", access_flds_all)
+    print('----------------------------------')
+    access_flds_use = ['wt_bs','wt_alt','abschgtmwt','pctchgtmwt','bs_5400','alt_5400','abschg5400','pctchg5400',
                    'pctbs5400','bs_5100','alt_5100','abschg5100','pctchg5100','pctbs5100','bs_4800','alt_4800','abschg4800',
                    'pctchg4800','pctbs4800','bs_4500','alt_4500','abschg4500','pctchg4500','pctbs4500','bs_4200','alt_4200',
                    'abschg4200','pctchg4200','pctbs4200','bs_3900','alt_3900','abschg3900','pctchg3900','pctbs3900','bs_3600',
@@ -49,8 +51,7 @@ def main():
                    'abschg1500','pctchg1500','pctbs1500','bs_1200','alt_1200','abschg1200','pctchg1200','pctbs1200','bs_900','alt_900',
                    'abschg900','pctchg900','pctbs900','bs_600','alt_600','abschg600','pctchg600','pctbs600','bs_300','alt_300',
                    'abschg300','pctchg300','pctbs300']
-    print("Accessibility fields to choose from:", access_flds)
-    print('----------------------------------')
+
     rac_file = mod.readInToDict(args.RAC_FILE)
     print("Rac field to choose from:", rac_file.fieldnames)
     print('----------------------------------')
@@ -58,14 +59,15 @@ def main():
     if '-group' in sys.argv:
         mapFile = mod.readInToDict(args.MAP_FIlE)
         print('fields from file that maps GEOID10 to City (GNIS_ID)', mapFile.fieldnames)
-        map_lab = input('Type the master field of the map label (GEOID10): ') or 'GEOID10'
-        group_id = input('Type the field of the group id (i.e. GNIS_ID) ') or 'GNIS_ID'
+        map_lab = input('Type the master field of the map label (3rd list shown) (GEOID10): ') or 'GEOID10'
+        group_id = input('Type the field of the group id (GNIS_ID) ') or 'GNIS_ID'
 
     #Prompt user for field names
-    orlab = input('Type the name of the field that corresponds with the accessibility file row labels, i.e. TAZ, label, ID ') or 'label'
-    access_flds.remove('{}'.format(orlab))
-    raclab = input('Type the field name for the origin label of the RAC file: ') or 'GEOID10'
-    worker_fld = input('Type field name containing number of workers, i.e. rac_C000: ') or 'racC000'
+    orlab = input('Type the name of the field that corresponds with the accessibility file row labels, i.e. TAZ, label, ID, GEOID10 ') or 'label'
+    #access_flds.append(orlab)
+    #access_flds.remove('{}'.format(orlab))
+    raclab = input('Type the field name for the origin label of the RAC file (GEOID10): ') or 'GEOID10'
+    worker_fld = input('Type field name containing number of workers (racC000): ') or 'racC000'
 
     #Make input dictionaries
     accessDict = makeNestedDict(access_file, orlab)
@@ -73,11 +75,11 @@ def main():
 
     #If the -all flag is given, make a file with all of the worker weighted values
     if '-all' in sys.argv:
-        allWWAccess(accessDict, racDict, access_flds, curtime)
+        allWWAccess(accessDict, racDict, access_flds_use, curtime)
     elif '-group' in sys.argv:
         #create dictionary of values that are relevent from the map file
         map, missing = makeMapDict(mapFile, map_lab, group_id)
-        groupWWAccess(accessDict, racDict, access_flds, curtime, map, group_id, missing,bar)
+        groupWWAccess(accessDict, racDict, access_flds_use, curtime, map, group_id, missing,bar)
         # output(curtime, outputDict, access_flds)
     #Prompt user for a single field to calc ww access
     else:
@@ -122,7 +124,7 @@ def singleWWAccess(accessDict, rac_dict):
     end(noRacCount)
 
 #Option 2, flag -group
-def groupWWAccess(access_dict, rac_dict, access_flds, curtime, map, group_id, missing, bar):
+def groupWWAccess(access_dict, rac_dict, access_flds_use, curtime, map, group_id, missing, bar):
     #make the new file name derived from the input file name
     file_name = str(sys.argv[2]).replace(".csv", "")
     outfile = open('{}_ww_grouped_{}.csv'.format(file_name, curtime), 'w', newline='')
@@ -153,7 +155,7 @@ def groupWWAccess(access_dict, rac_dict, access_flds, curtime, map, group_id, mi
                 # print('origin subset for city {}'.format(id))
         access_dict_subset = dict((k, access_dict[k]) for k in origin_subset)
         # print('access dict subset', access_dict_subset)
-        for field in access_flds:
+        for field in access_flds_use:
             print(field)
             accessList,workerList, noRacCount = lineUpLists(access_dict_subset,rac_dict, field)
             # if sum(workerList) is not 0 and len(accessList) > 1 and len(workerList) > 1:
@@ -177,14 +179,14 @@ def groupWWAccess(access_dict, rac_dict, access_flds, curtime, map, group_id, mi
 
 
 #Option 3, flag -all
-def allWWAccess(access_dict, rac_dict, access_flds, curtime):
+def allWWAccess(access_dict, rac_dict, access_flds_use, curtime):
     #make the new file name derived from the input file name
     file_name = str(sys.argv[2]).replace(".csv", "")
 
     outfile = open('{}_ww_{}.csv'.format(file_name, curtime), 'w', newline='')
     writer = csv.writer(outfile, delimiter=',')
 
-    for field in access_flds:
+    for field in access_flds_use:
         print(field)
         accessList, workerList, noRacCount = lineUpLists(access_dict, rac_dict, field)
         weighted_avg = average(accessList, weights=workerList)
