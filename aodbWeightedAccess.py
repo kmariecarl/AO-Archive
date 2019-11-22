@@ -59,7 +59,7 @@ def calcWWAvg(bar, cur):
         nation = {}
         for s in states:
             print("State = {}".format(s))
-            nation[s] = runRacQueries("states", "id", s, cur, writer, bar)
+            nation[s] = runRacQueries("states", "id", s, cur, bar)
             print(nation)
 
         # Begin averaging
@@ -90,7 +90,7 @@ def calcWWAvg(bar, cur):
             runRacWacQueries(cur, writer, bar)
         else:
             writer = writerR(zone, zone_id)
-            results_dict = runRacQueries(zone, zone_id_name, zone_id, cur, writer, bar)
+            results_dict = runRacQueries(zone, zone_id_name, zone_id, cur, bar)
             writeResults(results_dict, writer)
 
 def selectDistinct():
@@ -99,8 +99,17 @@ def selectDistinct():
         cur.execute(query.format())
         out = cur.fetchall()
         states = []
+        states_sorted = []
         for i in out:
-            states.append(str(i[0]))
+            states_sorted.append(int(i[0]))
+        states_sorted.sort()
+        for s in states_sorted:
+            if (s < 10):
+                num_str = "0"+str(s)
+            else:
+                num_str = str(s)
+
+            states.append(num_str)
         print('these are the unique state identifiers: ', states)
         return states
 
@@ -159,7 +168,7 @@ def runRacWacQueries(cur, writer, bar):
             writer.writerow(entry)
 
 # Creates a table of all-worker-weighted accessibility by travel threshold and time-weighted, does not assess different job sectors
-def runRacQueries(zone, zone_id_name, zone_id, cur, writer, bar):
+def runRacQueries(zone, zone_id_name, zone_id, cur, bar):
     thresh = [600, 1200, 1800, 2400, 3000, 3600]
     print("Thresholds included in this analysis: ", thresh)
     
@@ -178,7 +187,7 @@ def runRacQueries(zone, zone_id_name, zone_id, cur, writer, bar):
         for rac in rac_list:
             result = makeQuery(zone, zone_id_name, zone_id, t, rac, wac, cur)
             results_dict[t][rac] = result
-        # Populate time_weighted field with -1
+
     results_dict["tm_wt"] = {}
 
     # Iterate through results dict to computed time-weighted value for each LEHD variable
@@ -188,7 +197,7 @@ def runRacQueries(zone, zone_id_name, zone_id, cur, writer, bar):
         for t in thresh:
             if not time_wt_list:
                 result = results_dict[t][rac]
-                diff = result - 0
+                diff = result
                 exp = (math.exp(-0.08 * (t/60)))
                 term = diff * exp
                 time_wt_list.append(term)
@@ -199,12 +208,12 @@ def runRacQueries(zone, zone_id_name, zone_id, cur, writer, bar):
                 exp = (math.exp(-0.08 * (t/60)))
                 term = diff * exp
                 time_wt_list.append(term)
-        tm_wt = round(sum(time_wt_list), 1)
-        print('this is the output for thresh {}, RAC {}, WAC {}: '.format("tm_wt", rac, wac), tm_wt)
-        results_dict["tm_wt"][rac] = tm_wt
+            tm_wt = round(sum(time_wt_list), 1)
+            print('this is the output for thresh {}, RAC {}, WAC {}: '.format("tm_wt", rac, wac), tm_wt)
+            results_dict["tm_wt"][rac] = tm_wt
 
-        bar.next()
-        return results_dict
+    bar.next()
+    return results_dict
 
 
 
