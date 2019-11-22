@@ -6,9 +6,10 @@
 
 import argparse
 import time
+import sys
 from myToolsPackage import matrixLinkModule as mod
 from collections import defaultdict, OrderedDict
-from myToolsPackage.progress import bar
+from progress import bar
 
 # --------------------------
 #       FUNCTIONS
@@ -31,14 +32,12 @@ if __name__ == "__main__":
     parser.add_argument('-id', '--ID_FIELD', required=True, default=None) #i.e. GEOID10 or TAZ or label
     parser.add_argument('-thresh', '--THRESHOLD_FIELD', required=True, default=None) #i.e. threshold or cost
     parser.add_argument('-access', '--ACCESS_FIELD', required=True, default=None) #i.e. jobs or C000
-    parser.add_argument('-fname', '--FILE_NAME', required=True, default=None) #i.e. Transit16_access
     args = parser.parse_args()
 
     FILE = args.INPUT_FILE
     ID = args.ID_FIELD
     THRESHOLD = args.THRESHOLD_FIELD
     ACCESS = args.ACCESS_FIELD
-    NAME = args.FILE_NAME
 
     input = mod.readInToDict(FILE)
 
@@ -54,10 +53,17 @@ if __name__ == "__main__":
     print("Accessibility results transposed")
     bar.finish()
 
-    writer = mod.mkOutput('{}_transposed_2hor{}'.format(NAME, curtime), fieldname_list=fieldnames)
+    #make the new file name derived from the input file name
+    file_name = str(sys.argv[2]).replace(".csv", "")
+
+    writer = mod.mkOutput('{}_transposed_2hor{}'.format(file_name, curtime), fieldname_list=fieldnames)
+    writer.writerow(fieldnames)
 
     for id, outter in transpose_dict.items():
         entry = [id]
         for thresh, value in transpose_dict[id].items():
-            entry.append(value)
+            if value == 'NA':
+                entry.append(0)
+            else:
+                entry.append(value)
         writer.writerow(entry)
