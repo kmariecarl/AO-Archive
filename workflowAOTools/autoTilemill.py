@@ -7,6 +7,8 @@
 # This program should be run from Terminal which is open to the Tilemill project folder.
 # This program will export tilemill .png images into the MapBox/export folder
 
+# * May need to change os.path.exists below
+
 
 # Import subprocess for bash commands
 import subprocess
@@ -17,40 +19,90 @@ import csv
 
 
 def main(project_name, layer_list):
-    abs_val_fields = ["wt_bs", "wt_alt", "bs_5400", "alt_5400", "bs_5100", "alt_5100", "bs_4800", "alt_4800",
-                      "bs_4500", "alt_4500", "bs_4200", "alt_4200", "bs_3900", "alt_3900", "bs_3600", "alt_3600",
-                      "bs_3300", "alt_3300", "bs_3000", "alt_3000", "bs_2700", "alt_2700", "bs_2400", "alt_2400",
-                      "bs_2100", "alt_2100", "bs_1800", "alt_1800", "bs_1500", "alt_1500", "bs_1200", "alt_1200",
-                      "bs_900", "alt_900", "bs_600", "alt_600", "bs_300", "alt_300"]
+    # abs_val_fields = ["wt_bs", "wt_alt", "bs_5400", "alt_5400", "bs_5100", "alt_5100", "bs_4800", "alt_4800",
+    #                   "bs_4500", "alt_4500", "bs_4200", "alt_4200", "bs_3900", "alt_3900", "bs_3600", "alt_3600",
+    #                   "bs_3300", "alt_3300", "bs_3000", "alt_3000", "bs_2700", "alt_2700", "bs_2400", "alt_2400",
+    #                   "bs_2100", "alt_2100", "bs_1800", "alt_1800", "bs_1500", "alt_1500", "bs_1200", "alt_1200",
+    #                   "bs_900", "alt_900", "bs_600", "alt_600", "bs_300", "alt_300"]
+    # For access cost mapping, $1.50 increments transit + VOT
+    abs_val_fields = ["rwchg500", "rwchg650", "rwchg800", "rwchg950", "rwchg1100", "rwchg1250", "rwchg1400",
+                      "rwchg1550", "rwchg1700", "rwchg1850", "rwchg2000", "rwchg2150", "rwchg2300", "rwchg2450",
+                      "rwchg2600", "rwchg2750", "rwchg2900", "rwchg3050"]
 
-    pct_chg_fields = ["pctchgtmwt", "pctchg5400", "pctchg5100", "pctchg4800", "pctchg4500", "pctchg4200", "pctchg3900",
-                      "pctchg3600", "pctchg3300", "pctchg3000", "pctchg2700", "pctchg2400", "pctchg2100", "pctchg1800",
-                      "pctchg1500", "pctchg1200", "pctchg900", "pctchg600", "pctchg300"]
+    #Use when not dealing with VOT
+    cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+                           1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+                           1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
 
-    abs_chg_fields = ["abschgtmwt", "abschg5400", "abschg5100", "abschg4800", "abschg4500", "abschg4200", "abschg3900",
-                      "abschg3600", "abschg3300", "abschg3000", "abschg2700", "abschg2400", "abschg2100", "abschg1800",
-                      "abschg1500", "abschg1200", "abschg900", "abschg600", "abschg300", ]
+    # For access cost mapping, $0.50 increments for auto + VOT and PNR + VOT
+    # cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200, 3250, 3300,
+    #                        3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
+    #                        4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
+    #                        4950, 5000]
+    prefix = ["rwbs", "rwchg"]
+    abs_val_fields = []
+    for p in prefix:
+        for i in cost_thresh_list:
+            fieldstring = f"{p}{i}"
+            abs_val_fields.append(fieldstring)
+
+
+    # pct_chg_fields = ["pctchgtmwt", "pctchg5400", "pctchg5100", "pctchg4800", "pctchg4500", "pctchg4200", "pctchg3900",
+    #                   "pctchg3600", "pctchg3300", "pctchg3000", "pctchg2700", "pctchg2400", "pctchg2100", "pctchg1800",
+    #                   "pctchg1500", "pctchg1200", "pctchg900", "pctchg600", "pctchg300"]
+    #
+    # abs_chg_fields = ["abschgtmwt", "abschg5400", "abschg5100", "abschg4800", "abschg4500", "abschg4200", "abschg3900",
+    #                   "abschg3600", "abschg3300", "abschg3000", "abschg2700", "abschg2400", "abschg2100", "abschg1800",
+    #                   "abschg1500", "abschg1200", "abschg900", "abschg600", "abschg300", ]
 
 
     for layer in layer_list:
         for field in abs_val_fields:
+            # Remove any existing dynamic style file
+            if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+            else:
+                print("Style file does not exist")
             mssAbsVal(layer, field)
             renderMap(project_name, layer, field)
 
-    for layer in layer_list:
-        for field in pct_chg_fields:
-            mssPctChg(layer, field)
-            renderMap(project_name, layer, field)
 
-    for layer in layer_list:
-        for field in abs_chg_fields:
-            mssAbsChg(layer, field)
-            renderMap(project_name, layer, field)
+
+
+    #
+    # for layer in layer_list:
+    #     for field in pct_chg_fields:
+    #         # Remove any existing dynamic style file
+    #         if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+    #             os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+    #
+    #         else:
+    #             print("Style file does not exist")
+    #
+    #         mssPctChg(layer, field)
+    #         renderMap(project_name, layer, field)
+    #
+    # for layer in layer_list:
+    #     for field in abs_chg_fields:
+    #         # Remove any existing dynamic style file
+    #         if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+    #             os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+    #
+    #         else:
+    #             print("Style file does not exist")
+    #
+    #         mssAbsChg(layer, field)
+    #         renderMap(project_name, layer, field)
 
 
 def mssAbsVal(layer, field):
 
-    with open('dynamic.mss', 'w', newline='') as csvfile:
+    with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile)
         style = f"""#{layer} {{
         line-width: 0;
@@ -234,8 +286,9 @@ def mssAbsVal(layer, field):
 
             spamwriter.writerow([row])
 
+
 def mssPctChg(layer, field):
-    with open('dynamic.mss', 'w', newline='') as csvfile:
+    with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile)
         style = f"""#{layer} {{
         line-width: 0;
@@ -277,7 +330,7 @@ def mssPctChg(layer, field):
             spamwriter.writerow([row])
 
 def mssAbsChg(layer, field):
-    with open('dynamic.mss', 'w', newline='') as csvfile:
+    with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile)
         style = f"""#{layer} {{
         line-width: 0;
@@ -328,7 +381,7 @@ def renderMap(project_name, layer, field):
 
 if __name__ == '__main__':
 
-    project_name = input("Enter project name")
+    project_name = input("Enter project name: ")
 
     layer_list = []
     
