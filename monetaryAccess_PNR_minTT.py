@@ -1,23 +1,23 @@
-#This script is a new version of monetaryAccess_PNR.py that uses the pnr2dmin TT matrix as opposed to the old pnr2d15 matrix.
+# This script is a new version of monetaryAccess_PNR.py that uses the pnr2dmin TT matrix as opposed to the old pnr2d15 matrix.
 
-#This script reads in TAZ2PNR and PNR2DMin tables from PostGres DB and connects all viable paths then calculates the
-#time-based and time+cost based accessibility
+# This script reads in TAZ2PNR and PNR2DMin tables from PostGres DB and connects all viable paths then calculates the
+# time-based and time+cost based accessibility
 
-#example usage: kristincarlson~ python ~/Dropbox/Bus-Highway/Programs/gitPrograms/monetaryAccess_PNR_minTT.py -db TTMatrixLink
+# example usage: kristincarlson~ python ~/Dropbox/Bus-Highway/Programs/gitPrograms/monetaryAccess_PNR_minTT.py -db TTMatrixLink
 # -schema ttmatrices -table1 o2pnr -table2 pnr2dmin -jobstab jobs -costtab t2pnr_auto_cost -lim 31500 -scen d -fare 325 -vot 0
 
-#Cost scenarios to choose from:
+# Cost scenarios to choose from:
 # suma = sumfuel + sumrep + sumdep + FIXED
 # sumb = sumfuel + sumrep + sumdep + FIXED + sumvot
 # sumc = sumirs
 # sumd = sumfuel + sumrep + sumdep
 # sume = sumfuel + sumrep + sumdep + sumvot
 
-#Notes:
-#All costs listed in cents. ie. $4.00 listed as 400
-#I have tried many times to incorporate a PNR counter but numpy arrays do not support the operations I have tried
-#The transfer penalty is a min of 0 minutes and max of 15 minutes. Results from the depsumBin operation and aggregating
-#transit tt's to lower bin, max spread is 15 units
+# Notes:
+# All costs listed in cents. ie. $4.00 listed as 400
+# I have tried many times to incorporate a PNR counter but numpy arrays do not support the operations I have tried
+# The transfer penalty is a min of 0 minutes and max of 15 minutes. Results from the depsumBin operation and aggregating
+# transit tt's to lower bin, max spread is 15 units
 
 
 
@@ -38,6 +38,8 @@ from myToolsPackage.progress import bar
 #################################
 
 # Query the o2pnr matrix to make lists of unique origins, deptimes, and PNRs
+# Assumes that the deptimes in origin set are the same as destination set when that
+# may not always be the case
 def makeLists():
     print('Making input lists')
     #Faster way to select unique list of PNRs, deptimes, Destinations
@@ -67,8 +69,8 @@ def makeLists():
 
     return origin_list, pnr_list, or_dep_list, dest_list
 
-#This function relys on the db structure of the tt matrices already imported into postgresql.
-#Once the tt array has been extracted, convert to numpy array.
+# This function relys on the db structure of the tt matrices already imported into postgresql.
+# Once the tt array has been extracted, convert to numpy array.
 def createPNR2D15(pnr_list, deptime_list):
     print('Building pnr2d15 dictionary in memory...')
     pnr2d15 = defaultdict(lambda: defaultdict(list))
@@ -83,10 +85,10 @@ def createPNR2D15(pnr_list, deptime_list):
 
             tt = cur.fetchall()  # Listed by ordered destination
 
-            #Create a list of lists [tt, cost] then transform to numpy array
-            #Initialize cost as an empty value
-            #Now that Maxtimes are not included, these array's will be of variable length, need to add filler for
-            #destinations without a time value.
+            # Create a list of lists [tt, cost] then transform to numpy array
+            # Initialize cost as an empty value
+            # Now that Maxtimes are not included, these array's will be of variable length, need to add filler for
+            # destinations without a time value.
             tt_list = [[dest_tt[0], ] for dest_tt in tt]
             if len(tt_list) < DEST_NUM:
                 remainder = DEST_NUM - len(tt_list)
@@ -100,6 +102,7 @@ def createPNR2D15(pnr_list, deptime_list):
         print('PNR {} has been added to PNR2d15 dictionary'.format(pnr))
         mod.elapsedTime(start_time)
     return pnr2d15
+
 
 def createJobsDict():
     print('Building Jobs Dict', time.time() - t0)
@@ -287,7 +290,7 @@ if __name__ == '__main__':
     readable = time.ctime(start_time)
     t0 = time.time()
     print(readable)
-    bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=3030)
+    bar = bar.Bar(message='Processing', fill='@', suffix='%(percent)d%%', max=3030)
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
