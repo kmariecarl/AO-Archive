@@ -18,22 +18,20 @@ import os
 import csv
 
 
-def main(project_name, layer_list):
-    # abs_val_fields = ["wt_bs", "wt_alt", "bs_5400", "alt_5400", "bs_5100", "alt_5100", "bs_4800", "alt_4800",
-    #                   "bs_4500", "alt_4500", "bs_4200", "alt_4200", "bs_3900", "alt_3900", "bs_3600", "alt_3600",
-    #                   "bs_3300", "alt_3300", "bs_3000", "alt_3000", "bs_2700", "alt_2700", "bs_2400", "alt_2400",
-    #                   "bs_2100", "alt_2100", "bs_1800", "alt_1800", "bs_1500", "alt_1500", "bs_1200", "alt_1200",
-    #                   "bs_900", "alt_900", "bs_600", "alt_600", "bs_300", "alt_300"]
+def main(project_name, layer_list, zoom, width, height, options):
+
+
+    # ----------For access cost mapping----------
     # For access cost mapping, $1.50 increments transit + VOT
-    abs_val_fields = ["rwchg500", "rwchg650", "rwchg800", "rwchg950", "rwchg1100", "rwchg1250", "rwchg1400",
-                      "rwchg1550", "rwchg1700", "rwchg1850", "rwchg2000", "rwchg2150", "rwchg2300", "rwchg2450",
-                      "rwchg2600", "rwchg2750", "rwchg2900", "rwchg3050"]
+    # abs_val_fields = ["rwchg500", "rwchg650", "rwchg800", "rwchg950", "rwchg1100", "rwchg1250", "rwchg1400",
+    #                   "rwchg1550", "rwchg1700", "rwchg1850", "rwchg2000", "rwchg2150", "rwchg2300", "rwchg2450",
+    #                   "rwchg2600", "rwchg2750", "rwchg2900", "rwchg3050"]
 
     #Use when not dealing with VOT
-    cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
-                           1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
-                           1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
-                           2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
+    # cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
 
     # For access cost mapping, $0.50 increments for auto + VOT and PNR + VOT
     # cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
@@ -43,61 +41,77 @@ def main(project_name, layer_list):
     #                        3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
     #                        4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
     #                        4950, 5000]
-    prefix = ["rwbs", "rwchg"]
-    abs_val_fields = []
-    for p in prefix:
-        for i in cost_thresh_list:
-            fieldstring = f"{p}{i}"
-            abs_val_fields.append(fieldstring)
+    # For access cost mapping to add prefix to field names
+    # prefix = ["rwbs", "rwchg"]
+    # abs_val_fields = []
+    # for p in prefix:
+    #     for i in cost_thresh_list:
+    #         fieldstring = f"{p}{i}"
+    #         abs_val_fields.append(fieldstring)
+
+    # ----------For access time mapping----------
+    if options[0] == "Y":
+        abs_val_fields = ["wt_bs", "wt_alt", "bs_5400", "alt_5400", "bs_5100", "alt_5100", "bs_4800", "alt_4800",
+                          "bs_4500", "alt_4500", "bs_4200", "alt_4200", "bs_3900", "alt_3900", "bs_3600", "alt_3600",
+                          "bs_3300", "alt_3300", "bs_3000", "alt_3000", "bs_2700", "alt_2700", "bs_2400", "alt_2400",
+                          "bs_2100", "alt_2100", "bs_1800", "alt_1800", "bs_1500", "alt_1500", "bs_1200", "alt_1200",
+                          "bs_900", "alt_900", "bs_600", "alt_600", "bs_300", "alt_300"]
+
+        for layer in layer_list:
+            for field in abs_val_fields:
+                # Remove any existing dynamic style file
+                if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                    os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+                else:
+                    print("Style file does not exist")
+                mssAbsVal(layer, field)
+                renderMap(project_name, layer, field, zoom, width, height,)
+    else:
+        print("Absolute accessibility mapping not selected")
+
+    if options[1] == "Y":
+        abs_chg_fields = ["abschgtmwt", "abschg5400", "abschg5100", "abschg4800", "abschg4500", "abschg4200",
+                          "abschg3900",
+                          "abschg3600", "abschg3300", "abschg3000", "abschg2700", "abschg2400", "abschg2100",
+                          "abschg1800",
+                          "abschg1500", "abschg1200", "abschg900", "abschg600", "abschg300", ]
+
+        for layer in layer_list:
+            for field in abs_chg_fields:
+                # Remove any existing dynamic style file
+                if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                    os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+                else:
+                    print("Style file does not exist")
+
+                mssAbsChg(layer, field)
+                renderMap(project_name, layer, field, zoom, width, height,)
+    else:
+        print("Absolute change mapping not selected")
+
+    if options[2] == "Y":
+
+        pct_chg_fields = ["pctchgtmwt", "pctchg5400", "pctchg5100", "pctchg4800", "pctchg4500", "pctchg4200", "pctchg3900",
+                          "pctchg3600", "pctchg3300", "pctchg3000", "pctchg2700", "pctchg2400", "pctchg2100", "pctchg1800",
+                          "pctchg1500", "pctchg1200", "pctchg900", "pctchg600", "pctchg300"]
+
+        for layer in layer_list:
+            for field in pct_chg_fields:
+                # Remove any existing dynamic style file
+                if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                    os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+                else:
+                    print("Style file does not exist")
+
+                mssPctChg(layer, field)
+                renderMap(project_name, layer, field, zoom, width, height,)
+    else:
+        print("Percent change mapping not selected")
 
 
-    # pct_chg_fields = ["pctchgtmwt", "pctchg5400", "pctchg5100", "pctchg4800", "pctchg4500", "pctchg4200", "pctchg3900",
-    #                   "pctchg3600", "pctchg3300", "pctchg3000", "pctchg2700", "pctchg2400", "pctchg2100", "pctchg1800",
-    #                   "pctchg1500", "pctchg1200", "pctchg900", "pctchg600", "pctchg300"]
-    #
-    # abs_chg_fields = ["abschgtmwt", "abschg5400", "abschg5100", "abschg4800", "abschg4500", "abschg4200", "abschg3900",
-    #                   "abschg3600", "abschg3300", "abschg3000", "abschg2700", "abschg2400", "abschg2100", "abschg1800",
-    #                   "abschg1500", "abschg1200", "abschg900", "abschg600", "abschg300", ]
-
-
-    for layer in layer_list:
-        for field in abs_val_fields:
-            # Remove any existing dynamic style file
-            if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
-                os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
-
-            else:
-                print("Style file does not exist")
-            mssAbsVal(layer, field)
-            renderMap(project_name, layer, field)
-
-
-
-
-    #
-    # for layer in layer_list:
-    #     for field in pct_chg_fields:
-    #         # Remove any existing dynamic style file
-    #         if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
-    #             os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
-    #
-    #         else:
-    #             print("Style file does not exist")
-    #
-    #         mssPctChg(layer, field)
-    #         renderMap(project_name, layer, field)
-    #
-    # for layer in layer_list:
-    #     for field in abs_chg_fields:
-    #         # Remove any existing dynamic style file
-    #         if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
-    #             os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
-    #
-    #         else:
-    #             print("Style file does not exist")
-    #
-    #         mssAbsChg(layer, field)
-    #         renderMap(project_name, layer, field)
 
 
 def mssAbsVal(layer, field):
@@ -286,7 +300,9 @@ def mssAbsVal(layer, field):
 
             spamwriter.writerow([row])
 
-
+# Kristin, on 1/6/20 this scale was changed to line up with Pixelmator scale and adjust so that negative change bins
+# look "forward" as in a.k.a. between -1,000% and -100%, color is #9b5a18, between -100% and -50% is #ae6f2e. Discussed
+# this with Andrew
 def mssPctChg(layer, field):
     with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile)
@@ -294,33 +310,21 @@ def mssPctChg(layer, field):
         line-width: 0;
         polygon-opacity: 0.75;
         [{field}=null]{{polygon-fill:#ffffff;}}
-        [{field}>=-1.0]{{polygon-fill:#8b5015;}}
-        [{field}>=-0.8]{{polygon-fill:#9b5a18;}}
-        [{field}>=-0.6]{{polygon-fill:#A6611A;}}
-        [{field}>=-0.5]{{polygon-fill:#AE6F2E;}}
-        [{field}>=-0.4]{{polygon-fill:#B67D43;}}
-        [{field}>=-0.3]{{polygon-fill:#BE8C58;}}
-        [{field}>=-0.2]{{polygon-fill:#C69A6D;}}
-        [{field}>=-0.1]{{polygon-fill:#CEA882;}}
-        [{field}>=-0.01]{{polygon-fill:#D6B796;}}
-        [{field}>=-0.005]{{polygon-fill:#DEC5AB;}}
-        [{field}>=-0.0025]{{polygon-fill:#E6D3C0;}}
-        [{field}>=-0.001]{{polygon-fill:#EEE2D5;}}
-        [{field}<0]{{polygon-fill:#F6F0EA;}}
+        [{field}>=-10.0]{{polygon-fill:#9b5a18;}} 
+        [{field}>=-1.0]{{polygon-fill:#ae6f2e;}}
+        [{field}>=-0.5]{{polygon-fill:#b67d43;}}
+        [{field}>=-0.25]{{polygon-fill:#c69a6d;}}
+        [{field}>=-0.1]{{polygon-fill:#d6b796;}}
+        [{field}>=-0.05]{{polygon-fill:#e6d3c0;}}
+        [{field}>=-0.005]{{polygon-fill:#FFFFFF;}}
         [{field}=0]{{polygon-fill:#FFFFFF;}}
-        [{field}>0]{{polygon-fill:#E7F3F2;}}
-        [{field}>=0.001]{{polygon-fill:#D0E8E5;}}
-        [{field}>=0.0025]{{polygon-fill:#B9DDD8;}}
-        [{field}>=0.005]{{polygon-fill:#A2D2CB;}}
-        [{field}>=0.01]{{polygon-fill:#8BC7BE;}}
-        [{field}>=0.1]{{polygon-fill:#74BCB1;}}
-        [{field}>=0.2]{{polygon-fill:#5DB1A4;}}
-        [{field}>=0.3]{{polygon-fill:#46A697;}}
-        [{field}>=0.4]{{polygon-fill:#2F9B8A;}}
-        [{field}>=0.5]{{polygon-fill:#18907D;}}
-        [{field}>=0.6]{{polygon-fill:#018571;}}
-        [{field}>=0.8]{{polygon-fill:#007763;}}
-        [{field}>=1.0]{{polygon-fill:#006653;}}
+        [{field}>0]{{polygon-fill:#FFFFFF;}}
+        [{field}>=0.005]{{polygon-fill:#b9ddd8;}}
+        [{field}>=0.05]{{polygon-fill:#8bc7be;}}
+        [{field}>=0.1]{{polygon-fill:#5db1a4;}}
+        [{field}>=0.25]{{polygon-fill:#2f9b8a;}}
+        [{field}>=0.5]{{polygon-fill:#18907d;}}
+        [{field}>=1.0]{{polygon-fill:#018571;}}
         }}"""
         style_split = style.splitlines()
 
@@ -329,6 +333,8 @@ def mssPctChg(layer, field):
 
             spamwriter.writerow([row])
 
+
+ # One 12/30/19 we removed coloring for change +/- 200 of change
 def mssAbsChg(layer, field):
     with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile)
@@ -347,8 +353,10 @@ def mssAbsChg(layer, field):
         [{field}>=-5000]{{polygon-fill:#E6D3C0;}}
         [{field}>=-2500]{{polygon-fill:#EEE2D5;}}
         [{field}>=-1000]{{polygon-fill:#F6F0EA;}}
+        [{field}>=-200]{{polygon-fill:#FFFFFF;}}
         [{field}=0]{{polygon-fill:#FFFFFF;}}
-        [{field}>=1]{{polygon-fill:#E7F3F2;}}
+        [{field}>0]{{polygon-fill:#FFFFFF;}}
+        [{field}>=200]{{polygon-fill:#E7F3F2;}}
         [{field}>=1000]{{polygon-fill:#D0E8E5;}}
         [{field}>=2500]{{polygon-fill:#B9DDD8;}}
         [{field}>=5000]{{polygon-fill:#A2D2CB;}}
@@ -369,10 +377,10 @@ def mssAbsChg(layer, field):
 
 
 # # Render the project
-def renderMap(project_name, layer, field):
+def renderMap(project_name, layer, field, zoom, width, height,):
     os.chdir('/Applications/TileMill-2.app/Contents/Resources/')
-    bash_command = './index.js export {} ~/Documents/MapBox/export/{}_{}_{}.png --format=png --width=1600 ' \
-                   '--height=1600 --static_zoom=12 --verbose'.format(project_name, project_name, layer, field)
+    bash_command = f'./index.js export {project_name} ~/Documents/MapBox/export/{project_name}_{layer}_{field}.png --format=png --width={width} ' \
+                   f'--height={height} --static_zoom={zoom} --verbose'
     p4 = subprocess.Popen(bash_command, shell=True)
     p4.communicate()
 
@@ -381,7 +389,20 @@ def renderMap(project_name, layer, field):
 
 if __name__ == '__main__':
 
+    # Get user input
     project_name = input("Enter project name: ")
+
+    abs_switch = input("Make absolute accessibility maps? (Y/N) ")
+    chg_switch = input("Make absolute CHANGE accessibility maps? (Y/N) ")
+    pct_switch = input("Make PERCENT change accessibility maps? (Y/N) ")
+
+    options = [abs_switch, chg_switch, pct_switch]
+
+    zoom = input("Type zoom level 1-30: ")
+    width = input("Enter width in pixels (1600): ") or 1600
+    height = input("Enter height in pixels (1600): ") or 1600
+
+    print("Note: Default image dimensions: 1600 pxl X 1600 pxl")
 
     layer_list = []
     
@@ -395,6 +416,6 @@ if __name__ == '__main__':
     print("Layer list: ", layer_list)
 
 
-    main(project_name, layer_list)
+    main(project_name, layer_list, zoom, width, height, options)
 
 
