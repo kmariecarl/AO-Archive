@@ -5,6 +5,7 @@
 #NOTES: Must have a stop_times.txt file to read from and a trips file (with the heading) which contains only the trips
 #you cut out from the full trips.txt file.
 
+
 #################################
 #           IMPORTS             #
 #################################
@@ -55,11 +56,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     fieldnames = ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence', 'pickup_type', 'drop_off_type']
-
-    writer = mod.mkDictOutput('stop_times_reduced_{}'.format(curtime), fieldname_list=fieldnames)
-
-
-
+    outfile = open('stop_times_reduced.txt', 'w', newline='')
+    writer = csv.DictWriter(outfile, delimiter=',', fieldnames=fieldnames)
+    writer.writeheader()
 
     tripsList = makeTripsList(args.TRIPS_LIST_FILE)
 

@@ -1,6 +1,7 @@
 # This file reads in a list of trip IDs that have been removed from the trips.txt file and removes all shapes associated
 # with the routes/trips that the user wants to remove from GTFS feed.
 
+
 #################################
 #           IMPORTS             #
 #################################
@@ -23,7 +24,9 @@ def main():
     allShapesList = readRemoveShapes(args.REMOVE_SHAPES_FILE)
     # Write out new shapes file
     fieldnames = ['shape_id', 'shape_pt_lat', 'shape_pt_lon', 'shape_pt_sequence']
-    writer = mod.mkDictOutput('shapes_reduced_{}'.format(curtime), fieldname_list=fieldnames)
+    outfile = open('shapes_reduced.txt', 'w', newline='')
+    writer = csv.DictWriter(outfile, delimiter=',', fieldnames=fieldnames)
+    writer.writeheader()
     removeShapes(args.SHAPES_FILE, allShapesList, writer)
 
 

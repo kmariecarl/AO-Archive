@@ -4,6 +4,8 @@
 
 #Program prompts the user to give the route id
 
+# ToDo: remove trailing comma at the end of shapes_list output file
+
 #################################
 #           IMPORTS             #
 #################################
@@ -33,7 +35,9 @@ def main():
     # Write out new trips file
     fieldnames = ['route_id', 'service_id', 'trip_id', 'trip_headsign', 'direction_id', 'block_id', 'shape_id',
                    'wheelchair_accessible']
-    writer = mod.mkDictOutput('trips_reduced_{}'.format(curtime), fieldname_list=fieldnames)
+    outfile = open('trips_reduced.txt', 'w', newline='')
+    writer = csv.DictWriter(outfile, delimiter=',', fieldnames=fieldnames)
+    writer.writeheader()
     removeTrips(args.TRIPS_FILE, allTripsList, writer)
 
 
@@ -58,7 +62,7 @@ def initiate():
 
 def readRoutes():
 
-    input_string = input('Space seperated list of routes to match with trip IDs.')
+    input_string = input('Space seperated list of routes to match with trip IDs. ')
     input_list = input_string.split()
     usr_list = []
     for item in input_list:
