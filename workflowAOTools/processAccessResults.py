@@ -110,12 +110,13 @@ def calcAccessValues(label_list, thrshld_list, base_dict, change_dict, bar):
             name2 = 'alt_{}'.format(thrshld)
             name3 = 'abschg{}'.format(thrshld)
             name4 = 'pctchg{}'.format(thrshld)
-            name5 = 'pctbs{}'.format(thrshld)
+            # name5 = 'pctbs{}'.format(thrshld)
 
             # Add a column for the raw_base and raw_change accessibility values calculated for each threshold
             column[name1], column[name2] = rawValues(label, thrshld, base_dict, change_dict)
             # Find the raw and percent differences for the UNWEIGHTED accessibility values
-            column[name3], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
+            # column[name3], column[name5] = rawDiff(label, thrshld, base_dict, change_dict)
+            column[name3] = rawDiff(label, thrshld, base_dict, change_dict)
 
             column[name4] = pctDiff(column[name3], label, thrshld, base_dict)
 
@@ -161,6 +162,7 @@ def rawPctWeightAccess(label, base_acs_wt, change_acs_wt):
 
 
 # These two functions are applied to the UNWEIGHTED accessibility values
+# 3/5/2020 removed percent base from output but it could easily be reinstated
 def rawDiff(label, thrshld, base_dict, chg_dict):
     diff = round(chg_dict[thrshld][label] - base_dict[thrshld][label], 3)
     # add a new output column for access of update mode as a percent of base mode
@@ -168,7 +170,7 @@ def rawDiff(label, thrshld, base_dict, chg_dict):
         pctbs = round((chg_dict[thrshld][label]/base_dict[thrshld][label])*100, 3)
     else:
         pctbs = 0
-    return diff, pctbs
+    return diff  # pctbs
 
 # This function was added to simply put the raw base and change values for each block in the new dataset. This was
 # not originally part of this program but was greatly needed.
