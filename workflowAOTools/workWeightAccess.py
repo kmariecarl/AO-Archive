@@ -32,7 +32,7 @@ def main():
     parser.add_argument('-rac', '--RAC_FILE', required=True, default=None) #/Users/kristincarlson/Dropbox/DataSets/WAC_RAC/2015/Joined_RAC_FILE_20181003095127.csv
     parser.add_argument('-or_lab', '--ORIGIN_LABEL_FIELD', required=True, default='label') # accessibility file row labels, i.e. TAZ, label, ID, GEOID10
     parser.add_argument('-rac_lab', '--RAC_LABEL_FIELD', required=True, default='GEOID10')
-    parser.add_argument('-worker_lab', '--WORKER_LABEL_FIELD', required=True, default='racC000')
+    parser.add_argument('-worker_lab', '--WORKER_LABEL_FIELD', required=True, default='rC000')
     parser.add_argument('-all', action = 'store_true', required=False, help = 'write to file flag') #Flag to find all worker-weighted values
     parser.add_argument('-group','--MAP_FIlE', required = False, help = 'aggregation flag') #Flag to group WW averages by municipality or other level, needs file
     parser.add_argument('-map_lab', '--MAP_LABEL_FIELD', required=False, default='GEOID10') # Type the master field of the map label (3rd list shown)
@@ -51,17 +51,29 @@ def main():
     access_flds_all = list(access_file.fieldnames)
     # print("Accessibility fields to choose from:", access_flds_all)
     # print('----------------------------------')
+    # access_flds_use = ['wt_bs','wt_alt','abschgtmwt','pctchgtmwt','bs_5400','alt_5400','abschg5400','pctchg5400',
+    #                'pctbs5400','bs_5100','alt_5100','abschg5100','pctchg5100','pctbs5100','bs_4800','alt_4800','abschg4800',
+    #                'pctchg4800','pctbs4800','bs_4500','alt_4500','abschg4500','pctchg4500','pctbs4500','bs_4200','alt_4200',
+    #                'abschg4200','pctchg4200','pctbs4200','bs_3900','alt_3900','abschg3900','pctchg3900','pctbs3900','bs_3600',
+    #                'alt_3600','abschg3600','pctchg3600','pctbs3600','bs_3300','alt_3300','abschg3300','pctchg3300','pctbs3300',
+    #                'bs_3000','alt_3000','abschg3000','pctchg3000','pctbs3000','bs_2700','alt_2700','abschg2700','pctchg2700',
+    #                'pctbs2700','bs_2400','alt_2400','abschg2400','pctchg2400','pctbs2400','bs_2100','alt_2100','abschg2100',
+    #                'pctchg2100','pctbs2100','bs_1800','alt_1800','abschg1800','pctchg1800','pctbs1800','bs_1500','alt_1500',
+    #                'abschg1500','pctchg1500','pctbs1500','bs_1200','alt_1200','abschg1200','pctchg1200','pctbs1200','bs_900','alt_900',
+    #                'abschg900','pctchg900','pctbs900','bs_600','alt_600','abschg600','pctchg600','pctbs600','bs_300','alt_300',
+    #                'abschg300','pctchg300','pctbs300']
+
     access_flds_use = ['wt_bs','wt_alt','abschgtmwt','pctchgtmwt','bs_5400','alt_5400','abschg5400','pctchg5400',
-                   'pctbs5400','bs_5100','alt_5100','abschg5100','pctchg5100','pctbs5100','bs_4800','alt_4800','abschg4800',
-                   'pctchg4800','pctbs4800','bs_4500','alt_4500','abschg4500','pctchg4500','pctbs4500','bs_4200','alt_4200',
-                   'abschg4200','pctchg4200','pctbs4200','bs_3900','alt_3900','abschg3900','pctchg3900','pctbs3900','bs_3600',
-                   'alt_3600','abschg3600','pctchg3600','pctbs3600','bs_3300','alt_3300','abschg3300','pctchg3300','pctbs3300',
-                   'bs_3000','alt_3000','abschg3000','pctchg3000','pctbs3000','bs_2700','alt_2700','abschg2700','pctchg2700',
-                   'pctbs2700','bs_2400','alt_2400','abschg2400','pctchg2400','pctbs2400','bs_2100','alt_2100','abschg2100',
-                   'pctchg2100','pctbs2100','bs_1800','alt_1800','abschg1800','pctchg1800','pctbs1800','bs_1500','alt_1500',
-                   'abschg1500','pctchg1500','pctbs1500','bs_1200','alt_1200','abschg1200','pctchg1200','pctbs1200','bs_900','alt_900',
-                   'abschg900','pctchg900','pctbs900','bs_600','alt_600','abschg600','pctchg600','pctbs600','bs_300','alt_300',
-                   'abschg300','pctchg300','pctbs300']
+                   'bs_5100','alt_5100','abschg5100','pctchg5100','bs_4800','alt_4800','abschg4800',
+                   'pctchg4800','bs_4500','alt_4500','abschg4500','pctchg4500','bs_4200','alt_4200',
+                   'abschg4200','pctchg4200','bs_3900','alt_3900','abschg3900','pctchg3900','bs_3600',
+                   'alt_3600','abschg3600','pctchg3600','bs_3300','alt_3300','abschg3300','pctchg3300',
+                   'bs_3000','alt_3000','abschg3000','pctchg3000','bs_2700','alt_2700','abschg2700','pctchg2700',
+                   'bs_2400','alt_2400','abschg2400','pctchg2400','bs_2100','alt_2100','abschg2100',
+                   'pctchg2100','bs_1800','alt_1800','abschg1800','pctchg1800','bs_1500','alt_1500',
+                   'abschg1500','pctchg1500','bs_1200','alt_1200','abschg1200','pctchg1200','bs_900','alt_900',
+                   'abschg900','pctchg900','bs_600','alt_600','abschg600','pctchg600','bs_300','alt_300',
+                   'abschg300','pctchg300']
 
     rac_file = mod.readInToDict(args.RAC_FILE)
     # print("Rac field to choose from:", rac_file.fieldnames)
@@ -118,7 +130,12 @@ def makeNestedDict(access_file, or_lab):
 def makeRacDict(rac_file, rac_lab, worker_fld):
     racDict = {}
     for row in rac_file:
-        racDict[int(row['{}'.format(rac_lab)])] = int(row['{}'.format(worker_fld)])
+        # Check if GEOID10 is associated with a worker count (rC000)
+        if row['{}'.format(worker_fld)]:
+            racDict[int(row['{}'.format(rac_lab)])] = int(row['{}'.format(worker_fld)])
+        # Empty cell for worker count (rC000), append 0
+        else:
+            racDict[int(row['{}'.format(rac_lab)])] = 0
 
     return racDict
 
