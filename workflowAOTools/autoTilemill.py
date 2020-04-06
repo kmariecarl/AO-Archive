@@ -302,7 +302,8 @@ def mssAbsVal(layer, field):
 
 # Kristin, on 1/6/20 this scale was changed to line up with Pixelmator scale and adjust so that negative change bins
 # look "forward" as in a.k.a. between -1,000% and -100%, color is #9b5a18, between -100% and -50% is #ae6f2e. Discussed
-# this with Andrew
+# this with Andrew. 4/1/2020 "no change" zone updated from -0.5%--+0.5% to -1%--+0.5% to accommodate random access loss
+# that shows up in scenario evaluations
 def mssPctChg(layer, field):
     with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
         spamwriter = csv.writer(csvfile)
@@ -316,7 +317,7 @@ def mssPctChg(layer, field):
         [{field}>=-0.25]{{polygon-fill:#c69a6d;}}
         [{field}>=-0.1]{{polygon-fill:#d6b796;}}
         [{field}>=-0.05]{{polygon-fill:#e6d3c0;}}
-        [{field}>=-0.005]{{polygon-fill:#FFFFFF;}}
+        [{field}>=-0.01]{{polygon-fill:#FFFFFF;}}
         [{field}=0]{{polygon-fill:#FFFFFF;}}
         [{field}>0]{{polygon-fill:#FFFFFF;}}
         [{field}>=0.005]{{polygon-fill:#b9ddd8;}}
@@ -378,7 +379,8 @@ def mssAbsChg(layer, field):
 
 # # Render the project
 def renderMap(project_name, layer, field, zoom, width, height,):
-    os.chdir('/Applications/TileMill-2.app/Contents/Resources/')
+    # os.chdir('/Applications/TileMill-2.app/Contents/Resources/') old iMac path to Tilemill
+    os.chdir('/Users/kristincarlson/Applications/TileMill.app/Contents/Resources')
     bash_command = f'./index.js export {project_name} ~/Documents/MapBox/export/{project_name}_{layer}_{field}.png --format=png --width={width} ' \
                    f'--height={height} --static_zoom={zoom} --verbose'
     p4 = subprocess.Popen(bash_command, shell=True)
