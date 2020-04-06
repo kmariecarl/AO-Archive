@@ -16,9 +16,8 @@ import os
 import argparse
 import datetime
 import glob
-from bz2 import BZ2File
+from progress import bar
 from zipfile import ZipFile
-from time import sleep
 import io
 
 class Timer:
@@ -28,6 +27,15 @@ class Timer:
     
     def elapsed(self):
         return datetime.datetime.now() - self.start_time
+
+class ProgressBar:
+    def __init__(self, lines):
+        self.bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=lines)
+    def add_progress(self):
+        self.bar.next()
+    def end_progress(self):
+        self.bar.finish()
+
 
 def createdb(con):
     print('Creating DB Table')
@@ -51,12 +59,11 @@ def extract_data_and_load(infile, con):
             r = (zf.open(name))
             i = io.TextIOWrapper(r, encoding='UTF-8', newline=None)
             print(i)
+            p = ProgressBar(os.system(f"wc -l < {i}"))
             reader = csv.DictReader(i)
             header = next(reader)
-            #return [[row[i] for i in [0, 1, 2, 3]] for row in reader]
 
             for row in reader:
-                # data = [row["label"], row["deptime"], row["threshold"], row["{}".format(JOBS_LABEL)]]
                 data = [row["label"], row["deptime"], row["threshold"], row["wC000"], row["wCA01"], row["wCA02"],
                         row["wCA03"], row["wCE01"], row["wCE02"], row["wCE03"], row["wCNS01"], row["wCNS02"],
                         row["wCNS03"], row["wCNS04"], row["wCNS05"], row["wCNS06"], row["wCNS07"], row["wCNS08"],
@@ -68,14 +75,9 @@ def extract_data_and_load(infile, con):
                         row["wCFA04"], row["wCFA05"], row["wCFS01"], row["wCFS02"], row["wCFS03"], row["wCFS04"],
                         row["wCFS05"]]
                 cur.execute("""INSERT INTO data VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", data)
+                p.add_progress()
     con.commit()
 
-# def load(infile, con):
-#     print('Inserting values to DB table')
-#     data = extract_data(infile)
-#     cur = con.cursor()
-#     cur.executemany("INSERT INTO data VALUES (?,?,?,?)", data)
-#     con.commit()
 
 def create_indices(con):
     print("Indexing data table...")
@@ -87,8 +89,6 @@ def create_indices(con):
 def averages(con):
     print("Calculating averages...")
     cur = con.cursor()
-    #cur.execute("""SELECT label, threshold, CAST(avg({}) as integer)
-	#				FROM data GROUP BY label, threshold;""".format(JOBS_LABEL))
     cur.execute("""SELECT label, threshold, CAST(avg(wC000) as integer), CAST(avg(wCA01) as integer), CAST(avg(wCA02) as integer), CAST(avg(wCA03) as integer), CAST(avg(wCE01) as integer), CAST(avg(wCE02) as integer), CAST(avg(wCE03) as integer),
      CAST(avg(wCNS01) as integer), CAST(avg(wCNS02) as integer), CAST(avg(wCNS03) as integer), CAST(avg(wCNS04) as integer), CAST(avg(wCNS05) as integer), CAST(avg(wCNS06) as integer), CAST(avg(wCNS07) as integer), CAST(avg(wCNS08) as integer), CAST(avg(wCNS09) as integer), CAST(avg(wCNS10) as integer),
      CAST(avg(wCNS11) as integer), CAST(avg(wCNS12) as integer), CAST(avg(wCNS13) as integer), CAST(avg(wCNS14) as integer), CAST(avg(wCNS15) as integer), CAST(avg(wCNS16) as integer), CAST(avg(wCNS17) as integer), CAST(avg(wCNS18) as integer), CAST(avg(wCNS19) as integer), CAST(avg(wCNS20) as integer),
@@ -116,7 +116,7 @@ def write_averages(con, infile):
 def make_avg_filename(infile):
     return "1-{}-avg".format(infile)
 
-def process(results_directory, output_dir):
+def process(p, results_directory, output_dir):
 
     zippaths = glob.glob(os.path.join(results_directory,'*.zip'))
     numfiles = len(zippaths)
@@ -126,21 +126,24 @@ def process(results_directory, output_dir):
         print('Processing averages for file {}...'.format(infile))
         with sqlite3.connect(":memory:") as sqlite_con:
             createdb(sqlite_con)
+            p.add_progress()
             extract_data_and_load(infile, sqlite_con)
+            p.add_progress()
             outfile = os.path.join(output_dir,"{}.csv".format(make_avg_filename(os.path.splitext(os.path.basename(infile))[0])))
             write_averages(sqlite_con, outfile)
+            p.add_progress()
             print("\n 	Wrote averages to {} for infile {}".format(outfile, infile))
             dropdb(sqlite_con)
+            p.add_progress()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--results_directory', required=True, default=None)
     parser.add_argument('-o', '--output_dir', required=True, default=None)
-    #parser.add_argument('-access_abbrev', '--ACCESS_ABBREVIATION', required=False, default=None) #i.e. w, W, w_, W_, R_, etc.
     args = parser.parse_args()
 
-    #JOBS_LABEL = args.ACCESS_LABEL
 
     t = Timer()
-    process(args.results_directory, args.output_dir)
+    p = ProgressBar(4)
+    process(p, args.results_directory, args.output_dir)
     print("\nCompleted processing all files in {})".format(t.elapsed()))
