@@ -166,10 +166,10 @@ def rawPctWeightAccess(label, base_acs_wt, change_acs_wt):
 def rawDiff(label, thrshld, base_dict, chg_dict):
     diff = round(chg_dict[thrshld][label] - base_dict[thrshld][label], 3)
     # add a new output column for access of update mode as a percent of base mode
-    if int(base_dict[thrshld][label]) != 0:
-        pctbs = round((chg_dict[thrshld][label]/base_dict[thrshld][label])*100, 3)
-    else:
-        pctbs = 0
+    # if int(base_dict[thrshld][label]) != 0:
+    #     pctbs = round((chg_dict[thrshld][label]/base_dict[thrshld][label])*100, 3)
+    # else:
+    #     pctbs = 0
     return diff  # pctbs
 
 # This function was added to simply put the raw base and change values for each block in the new dataset. This was
@@ -205,7 +205,7 @@ def output(final_results, thrshld_list, file_base, file_updt):
             fieldnames.append('alt_{}'.format(str(thrshld)))
             fieldnames.append('abschg{}'.format(str(thrshld)))
             fieldnames.append('pctchg{}'.format(str(thrshld)))
-            fieldnames.append('pctbs{}'.format(str(thrshld)))
+            # fieldnames.append('pctbs{}'.format(str(thrshld)))
         writer = csv.DictWriter(outfile, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()
         for label in final_results:
