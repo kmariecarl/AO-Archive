@@ -50,12 +50,12 @@ def extract_data_and_load(infile, con):
             r = (zf.open(name))
             i = io.TextIOWrapper(r, encoding='UTF-8', newline=None)
             print(i)
-            reader = csv.reader(i)
+            reader = csv.DictReader(i)
             header = next(reader)
             #return [[row[i] for i in [0, 1, 2, 3]] for row in reader]
 
             for row in reader:
-                data = [row[0], row[1], row[2], row[3]]
+                data = [row["label"], row["deptime"], row["threshold"], row["{}".format(JOBS_LABEL)]]
                 cur.execute("INSERT INTO data VALUES (?,?,?,?)", data)
     con.commit()
 
@@ -84,7 +84,7 @@ def averages(con):
 def write_averages(con, infile):
     create_indices(con)
     data = averages(con)
-    with open(infile,"w") as outputfile: #, newline='' , encoding='utf-8'
+    with open(infile, "w") as outputfile: #, newline='' , encoding='utf-8'
         writer = csv.writer(outputfile)
         header = ["label","threshold","jobs"]
         writer.writerow(header)
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--results_directory', required=True, default=None)
     parser.add_argument('-o', '--output_dir', required=True, default=None)
-    parser.add_argument('-access', '--ACCESS_LABEL', required=True, default=None) #i.e. jobs or C000
+    parser.add_argument('-access', '--ACCESS_LABEL', required=True, default=None) #i.e. jobs or C000 or wC000
     args = parser.parse_args()
 
     JOBS_LABEL = args.ACCESS_LABEL
