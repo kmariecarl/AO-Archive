@@ -34,6 +34,8 @@ import psycopg2
 import time
 from progress import bar
 import math
+import sys
+import os
 
 #################################
 #           FUNCTIONS           #
@@ -47,19 +49,24 @@ def calcWWAvg(bar, cur):
     rac_list = ["C000", "CA01", "CA02", "CA03", "CE01", "CE02", "CE03", "CR01", "CR02", "CR03",
                    "CR04", "CR05", "CR07", "CT01", "CT02", "CD01", "CD02", "CD03", "CD04", "CS01", "CS02"]
 
+
     #flag = input("Calculate worker-weighted averages for nation? Type y/n")
     if input("Calculate worker-weighted averages for nation? Type y/n: ") == "y":
-        #writer = writerR("states", "id")
 
         fieldnames = ["tm_wt", "avg"]
         writer = mod.mkDictOutput('{}_NATION_TM_WT_AVG'.format(MODE), fieldname_list=fieldnames)
 
         states = selectDistinct()
+        print("Number of states", len(states))
 
+        # Begin iterating through states
         nation = {}
         for s in states:
             print("State = {}".format(s))
             nation[s] = runRacQueries("states", "id", s, cur, bar)
+            #----BEEP----
+            os.system(f"say {s}")
+            bar.next()
             print(nation)
 
         # Begin averaging
@@ -72,10 +79,11 @@ def calcWWAvg(bar, cur):
             list_sum = sum(avg_list)
             rac_avg = list_sum/len(avg_list)
             avg_dict[rac] = rac_avg
-            print("Average for rac {}".format(rac))
+            print("Average for rac {} ".format(rac), rac_avg)
 
-        for row in avg_dict:
-            writer.writerow(row)
+        for key, value in avg_dict.items():
+            entry = {"tm_wt": key, "avg": round(value, 0)}
+            writer.writerow(entry)
 
 
 
@@ -142,7 +150,7 @@ def writerR(zone, zone_id):
 # but not travel time weighted measure. Works 10/31/19
 def runRacWacQueries(cur, writer, bar):
     # 90 minutes not available in the transit 2017 dataset
-    thresh = [1800]
+    # thresh = [1800] fix to be all thresholds
     print("Thresholds included in this analysis: ", thresh)
     # the rac_list is taken from the general lehd schema, not access results tables
     rac_list = ["C000", "CA01", "CA02", "CA03", "CE01", "CE02", "CE03", "CR01", "CR02", "CR03", "CR04", "CR05",
@@ -174,6 +182,7 @@ def runRacQueries(zone, zone_id_name, zone_id, cur, bar):
     
     rac_list = ["C000", "CA01", "CA02", "CA03", "CE01", "CE02", "CE03", "CR01", "CR02", "CR03", "CR04", "CR05",
                 "CR07", "CT01", "CT02", "CD01", "CD02", "CD03", "CD04", "CS01", "CS02"]
+
     print("Worker groups included in this analysis: ", rac_list)
     
     wac = "w_c000"
@@ -210,9 +219,10 @@ def runRacQueries(zone, zone_id_name, zone_id, cur, bar):
                 time_wt_list.append(term)
             tm_wt = round(sum(time_wt_list), 1)
             print('this is the output for thresh {}, RAC {}, WAC {}: '.format("tm_wt", rac, wac), tm_wt)
+            #sys.stdout.write('\a')
             results_dict["tm_wt"][rac] = tm_wt
 
-    bar.next()
+
     return results_dict
 
 
