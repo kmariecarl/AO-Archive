@@ -1,5 +1,6 @@
 # This script is designed to create unique field names for TomTom POI data based on a concatenation of "package",
-# "Feature type", and "Service Sub Category" fields. Creates approximately 620 fields.
+# "Feature type", and "Service Sub Category" fields. Creates approximately 384 fields. Then sums the number of each
+# type of destination per block.
 
 # Output filetype is a csv maybe a sqlite db
 
@@ -45,30 +46,19 @@ class InputFile:
     def generate_fields(self):
         fields_list = []
         for id, row in self.dict.items():
-            if int(row['SUBCAT']) == 0:
-                new_field_str = "{}".format(row['PACKAGE']) + "{}".format(row['FEATTYP']) + "{}".format(row['SUBCAT'])
-                new_field = int(new_field_str)
-                if new_field not in fields_list:
-                    fields_list.append(new_field)
-            else:
-                new_field_str = "{}".format(row['PACKAGE']) + "{}".format(row['FEATTYP']) + "{}".format(row['SUBCAT'])
-                new_field = int(new_field_str)
-                if new_field not in fields_list:
-                    fields_list.append(new_field)
+            new_field_str = "_{}".format(row['PACKAGE']) + "{}".format(row['FEATTYP']) + "{}".format(row['SUBCAT'])
+            new_field = int(new_field_str)
+            if new_field not in fields_list:
+                fields_list.append(new_field)
 
-        # Sort by first digit in ascending order
-        # This converts each element into a string,
-        # takes the first character (which would be the first digit),
-        # and converts that back into an integer.
-        # Python then sorts the numbers based on that first digit.
-        # Solution from:
-        # https://stackoverflow.com/questions/44622694/sort-a-list-on-the-basis-of-first-digit-of-the-elements
-        fields_list.sort(key=lambda x: int(str(x)[0]))
+        fields_list.sort()
+        fields_list.insert(0, 'GEOID10')
         print("Fields list: \n", fields_list)
         print("Length of fields list: ", len(fields_list))
         return fields_list
 
     def generate_GEOID10_list(self):
+        print("Generating GEOID10 list")
         geoid10_list = []
         for id, row in self.dict.items():
             if int(row['GEOID10']) not in geoid10_list:
@@ -76,11 +66,12 @@ class InputFile:
         print("Number of GEOID10: ", len(geoid10_list))
         return geoid10_list
 
-    def sum_over_fields(self, geoid10_list, output):
+    def sum_over_fields(self, output):
+        print("Summing over POI fields")
         # Instantiate progress bar
         bar = ProgressBar(len(self.dict.keys()))
         for id, row in self.dict.items():
-            field_str = "{}".format(row['PACKAGE']) + "{}".format(row['FEATTYP']) + "{}".format(row['SUBCAT'])
+            field_str = "_{}".format(row['PACKAGE']) + "{}".format(row['FEATTYP']) + "{}".format(row['SUBCAT'])
             field = int(field_str)
             output[int(row['GEOID10'])][field] += 1
             bar.add_progress()
@@ -98,6 +89,8 @@ def make_empty_output(fields_list, geoid10_list):
 
 def write_out(output_filled, writer):
     for g, f in output_filled.items():
+        entry = {'GEOID10': g} #Attach the outtermost dict key (GEOID10) to output
+        f.update(entry)
         writer.writerow(f)
 
 if __name__ == "__main__":
@@ -114,10 +107,11 @@ if __name__ == "__main__":
 
 
     fields_list = file.generate_fields()
-    geoid10_list = file.generate_GEOID10_list()
-    output = make_empty_output(fields_list, geoid10_list)
-
-    output_filled = file.sum_over_fields(geoid10_list, output)
-
     writer = mod.mkDictOutput("sumPOI2Block", fields_list)
+
+    geoid10_list = file.generate_GEOID10_list()
+
+    output = make_empty_output(fields_list, geoid10_list)
+    output_filled = file.sum_over_fields(output)
+
     write_out(output_filled, writer)
