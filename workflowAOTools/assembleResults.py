@@ -134,6 +134,7 @@ class AccessFile:
         bash_command = f"python /Users/kristincarlson/Dropbox/Programs/gitBus-Highway/workflowAOTools/prettyWWTables.py" \
             f" -access {processed} -rac {rac} -ctu {ctu} -ctu_names {ctu_names}"
         run_command(bash_command)
+
 # --------------------------
 #       GENERAL FUNCTIONS
 # --------------------------

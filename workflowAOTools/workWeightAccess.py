@@ -164,7 +164,7 @@ def groupWWAccess(access_dict, rac_dict, access_flds_use, map, group_id, bar):
     #make the new file name derived from the input file name
     file_name = str(sys.argv[2]).replace(".csv", "")
     file_name2 = file_name.replace("2-", "3-")
-    outfile = open('{}-ww-grouped.csv'.format(file_name2), 'w', newline='')
+    outfile = open('{}-ww-grouped-{}.csv'.format(file_name2, group_id), 'w', newline='')
     writer = csv.writer(outfile, delimiter=',')
     writer.writerow([f'{group_id}', 'measure', 'value'])
     output_dict = {}
@@ -180,7 +180,7 @@ def groupWWAccess(access_dict, rac_dict, access_flds_use, map, group_id, bar):
     #for each unique id, perform the ww calculations
     for id in unique:
         output_dict[id] = OrderedDict()
-        print('Find origins that belong in the {} aggregation (city)'.format(id))
+        print('\n Find origins that belong in the {} aggregation (city)'.format(id))
         #create a subset of access_dict with only the origins that match the unique_id
         origin_subset = []
         for origin in access_dict:
@@ -193,16 +193,14 @@ def groupWWAccess(access_dict, rac_dict, access_flds_use, map, group_id, bar):
         access_dict_subset = dict((k, access_dict[k]) for k in origin_subset)
         # print('access dict subset', access_dict_subset)
         for field in access_flds_use:
-            print(field)
             accessList,workerList, noRacCount = lineUpLists(access_dict_subset,rac_dict, field)
             # if sum(workerList) is not 0 and len(accessList) > 1 and len(workerList) > 1:
             if sum(workerList) is not 0:
                 # print(workerList)
-                if id == 663529:
-                    print("access list", accessList)
-                    print('worker list', workerList)
+                # if id == 663529:
+                #     print("access list", accessList)
+                #     print('worker list', workerList)
                 weighted_avg = average(accessList, weights=workerList)
-                print(weighted_avg)
             else:
                 print('This city has no workers?',id)
                 weighted_avg = 'NA'
@@ -212,7 +210,7 @@ def groupWWAccess(access_dict, rac_dict, access_flds_use, map, group_id, bar):
             row = id, field, weighted_avg
             writer.writerow(row)
         bar.next()
-    print('Grouped WW Accessibility Results Finished')
+    print('\n Grouped WW Accessibility Results Finished')
 
 
 #Option 3, flag -all
