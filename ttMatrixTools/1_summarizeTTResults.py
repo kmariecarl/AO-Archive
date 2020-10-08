@@ -1,6 +1,7 @@
 # This script processes a csv file of output from Analyst-0.2.3-smx using the 'matrix' operation.
 # The output is a table within a PostgreSQl database that contains the min, max and deciles of traveltime
-# between OD pairs for the selected time period.
+# between OD pairs for the selected time period. This code is flexible for any matrix input as long as there are
+# columns for origin, destination, deptime, traveltime
 
 # NOTE: Requires import of the aggs_for_arrays extension in the Postgresql database you are working in
 # https://pgxn.org/dist/aggs_for_arrays/
@@ -54,12 +55,33 @@ class DBObject:
         print(self.cursor.mogrify(query))
         print(datetime.now())
 
-    def create_table(self):
+    def create_table_tt(self):
         print("Creating input table")
         query = f"CREATE TABLE IF NOT EXISTS {self.schema}.{self.table} (origin BIGINT, destination BIGINT, deptime CHAR(4), traveltime INTEGER)"
         self.cursor.execute(query)
         print(self.cursor.mogrify(query))
         print(datetime.now())
+
+    def create_table_cmltv(self, destination_types):
+        print("Creating input table")
+        column_str = "(label BIGINT, deptime CHAR(4), threshold INTEGER,"
+        for i in destination_types:
+            column_str = column_str + str(i) + " INTEGER, "
+        column_str = column_str[:-2]
+        column_str = column_str + ")"
+        query = f"CREATE TABLE IF NOT EXISTS {self.schema}.{self.table} {column_str}"
+        self.cursor.execute(query)
+        print(self.cursor.mogrify(query))
+        print(datetime.now())
+
+    # Three different code sections to attempt to load data without unzipping results file
+    def copy_from(self, file_path):
+            print("Copying data into DB")
+            print("NOTE: ~0.7257 GB of data is loaded every minute")
+            query = f"COPY {self.schema}.{self.table} FROM '{file_path}' DELIMITER ',' CSV HEADER"
+            self.cursor.execute(query)
+            print(self.cursor.mogrify(query))
+            print(datetime.now())
 
     # Create inidvidual indicies
     def create_index(self, field):
@@ -69,7 +91,7 @@ class DBObject:
         print(f'{field} index added to table {self.table}')
         print(datetime.now())
 
-    def create_output_table(self, table_out):
+    def create_output_table_tt(self, table_out):
         print("Creating output table")
         query = f"CREATE TABLE IF NOT EXISTS {self.schema}.{table_out} (origin bigint, destination bigint, " \
                 f"_min integer,_10th int, _20th int, _30th int, _40th int, _50th int," \
@@ -78,68 +100,16 @@ class DBObject:
         print(self.cursor.mogrify(query))
         print(datetime.now())
 
-    # Three different code sections to attempt to load data without unzipping results file
-    def copy_from(self, file_path):
-        # bash_command = f"bzcat TT_AWS_Station-results.csv.bz2 | wc"
-        # # out = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE).communicate()[0]
-        # out = subprocess.Popen(bash_command.split(), stdout=sys.stdout, stderr=sys.stderr).communicate()[0]
-        # linecount = out.split()
-        # print(linecount)
-        # load_bar = ProgressBar(211736889)
+    def create_output_table_cmltv(self, table_out):
+        print("Creating output table")
+        query = f"CREATE TABLE IF NOT EXISTS {self.schema}.{table_out} (origin bigint, destination_count int, " \
+                f"_min integer,_10th int, _20th int, _30th int, _40th int, _50th int," \
+                f"_60th int, _70th int, _80th int, _90th int, _max int)"
+        self.cursor.execute(query)
+        print(self.cursor.mogrify(query))
+        print(datetime.now())
 
-        # print("Opening zipped file")
-        # with bz2.open(f"{file_path}", "rt") as f:
-        #     next(f)  # Skip header row
-        #     print("Reading zipped file into table")
-        #     for row in f:
-        #         i = row.split(',')
-        #         query = f"INSERT INTO {self.schema}.{self.table} (origin, destination, deptime, traveltime)" \
-        #                 f"VALUES ({i[0]}, {i[1]}, {i[2]}, {i[3]})"
-        #
-        #         self.cursor.execute(query)
-        #         load_bar.add_progress()
-        #
-        #     load_bar.end_progress()
-        #     print(datetime.now())
-
-# # Credit to http://yogeshsakhreliya.blogspot.com/2019/10/insert-multiple-records-in-postgresql.html
-#         with bz2.open(f"{file_path}", "rt") as f:
-#             next(f)  # Skip header row
-#             print("Reading zipped file into table")
-#
-#             final_data = []  # create chunks of 4 million rows
-#             count = 0
-#             for row in f:
-#                 if row and count < 4000000:
-#                     i = row.split(',')
-#                     final_data.append((i[0], i[1], i[2], i[3]))
-#                     count += 1
-#                 else:
-#                     extras.execute_values(self.cursor, f"INSERT INTO {self.schema}.{self.table} "
-#                                                        f"(origin, destination, deptime, traveltime)"
-#                                                        f" VALUES %s", final_data)  # %s stands for a wildcard row of data
-#                     print("chunk of 4,000,000 rows added")
-#                     count = 0
-#                     final_data = []
-#
-#         print(datetime.now())
-#         with bz2.open(f"{file_path}", 'rb') as f:
-#             # next(f)  # Skip header row
-#             print("Copying data into DB")
-#             print("NOTE: ~0.7257 GB of data is loaded every minute")
-#             # this_copy = f'''COPY {self.schema}.{self.table} FROM '{f}' WITH CSV HEADER  '''
-#             # self.cursor.copy_expert(f'''COPY {self.schema}.{self.table} FROM stdin WITH CSV HEADER  ''', f)
-#             # self.cursor.copy_expert(f, f"{self.table}")
-#             self.cursor.copy_from(f, f"{self.schema}.{self.table}", sep=",")
-
-            print("Copying data into DB")
-            print("NOTE: ~0.7257 GB of data is loaded every minute")
-            query = f"COPY {self.schema}.{self.table} FROM '{file_path}' DELIMITER ',' CSV HEADER"
-            self.cursor.execute(query)
-            print(self.cursor.mogrify(query))
-            print(datetime.now())
-
-
+    # uses linear interpolation to determine percentile when landing between to values
     def write_sql_function(self):
         print("Writing calc_deciles function")
         postgresql_function = """create or replace function calc_deciles(_tt integer[])
@@ -163,14 +133,15 @@ class DBObject:
         print(self.cursor.mogrify(postgresql_function))
         print(datetime.now())
 
-    def calc_deciles(self, table_out):
+    def calc_deciles_tt(self, table_out):
         print("Performing decile calculation and inserting data to new table")
         print("NOTE: ~0.342 GB of data is processed per minute")
         print("NOTE: Current program version does not apply indicies to the raw TT table")
         query = f"""insert into {self.db}.{self.schema}.{table_out}
                     select subq.origin, subq.destination, 
-                        tile[1] as _min, tile[2] as _10th, tile[3] as _20th, tile[4] as _30th, tile[5]as _40th, tile[6] as _50th, 
-                        tile[7] as _60th, tile[8] as _70th, tile[9] as _80th, tile[10] as _90th, tile[11] as _max
+                        tile[1] as _min, tile[2] as _10th, tile[3] as _20th, tile[4] as _30th, tile[5] as _40th, 
+                        tile[6] as _50th, tile[7] as _60th, tile[8] as _70th, tile[9] as _80th, tile[10] as _90th,
+                        tile[11] as _max
                     from (
                         select origin, destination, calc_deciles(array_agg(traveltime)) as tile
                         from {self.db}.{self.schema}.{self.table}
@@ -179,42 +150,33 @@ class DBObject:
         print(self.cursor.mogrify(query))
         print(datetime.now())
 
+    def calc_deciles_cmltv(self, table_out, dest):
+        print("Performing decile calculation and inserting data to new table")
+        print("NOTE: ~0.xxx GB of data is processed per minute")
+        print("NOTE: Current program version does not apply indicies to the raw TT table")
+        query = f"""insert into {self.db}.{self.schema}.{table_out}
+                    select subq2.label, subq2.{dest}, 
+                        tile[1] as _min, tile[2] as _10th, tile[3] as _20th, tile[4] as _30th, tile[5] as _40th, 
+                        tile[6] as _50th, tile[7] as _60th, tile[8] as _70th, tile[9] as _80th, tile[10] as _90th,
+                        tile[11] as _max
+                    from (
+                        select subq.label, subq.{dest}, calc_deciles(array_agg(traveltime)) as tile
+                        from (
+                            select "label", deptime, {dest}, (array_agg(threshold order by threshold ))[1] as traveltime
+                            from {self.db}.{self.schema}.{self.table} group by "label", deptime, {dest} order by "label") 
+                            as subq group by "label", {dest} ) 
+                         as subq2;"""
+        self.cursor.execute(query)
+        print(self.cursor.mogrify(query))
+        print(datetime.now())
 
-    # def median_tt(self, pairs, table_out):
-    #     mybar = ProgressBar(2854475) #296 x 120 x 49127 = 15858196 x 0.18 = 2854475
-    #     for tup in pairs:
-    #         o = tup[0]
-    #         d = tup[1]
-    #         query = f"SELECT ROUND(PERCENTILE_CONT(0.50) " \
-    #                     f"WITHIN GROUP (ORDER BY nested.traveltime)::NUMERIC, 0) AS median_tt " \
-    #                     f"FROM (" \
-    #                             f"SELECT origin, destination, traveltime " \
-    #                             f"FROM {self.schema}.{self.table} " \
-    #                             f"WHERE destination = {d} AND origin = {o}" \
-    #                     f") AS nested;" \
-    #
-    #         self.cursor.execute(query)
-    #         c = self.cursor.fetchall()
-    #         query2 = f"INSERT INTO {self.schema}.{table_out} (origin, destination, traveltime)" \
-    #                  f"VALUES ({o}, {d}, {c[0][0]});"
-    #         self.cursor.execute(query2)
-    #         mybar.add_progress()
-    #     mybar.end_progress()
-    #     print(datetime.now())
+
     def clean_close(self):
         self.cursor.close()
         print("\n Connection closed")
 
 def run_command(bash_command):
-    # process = subprocess.Popen(bash_command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    # output, error = process.communicate()
-    # print(error)
-    # print(output)
-
     subprocess.Popen(bash_command.split(), stdout=sys.stdout, stderr=sys.stderr).communicate() # stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-
-
 
 
 #################################
@@ -227,7 +189,8 @@ if __name__ == '__main__':
 
     # Parameterize file paths
     parser = argparse.ArgumentParser()
-
+    parser.add_argument('-run_type', '--TT_OR_CMLTV', required=True,
+                        default=None)  # Is the data from the TT matrix or a cumulative access analysis? TT or CMLTV
     parser.add_argument('-db', '--DB_NAME', required=True, default=None)  # ENTER AS kristincarlson
     parser.add_argument('-schema', '--SCHEMA_NAME', required=True, default=None)  # ENTER AS public
     parser.add_argument('-table_in', '--TABLE_INPUT_NAME', required=True,
@@ -240,14 +203,40 @@ if __name__ == '__main__':
 
     # instantiate a db object
     my_db_obj = DBObject(args.DB_NAME, args.SCHEMA_NAME, args.TABLE_INPUT_NAME)
-    my_db_obj.drop_table(args.TABLE_OUTPUT_NAME)
-    my_db_obj.create_table()
-        # my_db_obj.create_index("origin")
-        # my_db_obj.create_index("destination")
-    my_db_obj.create_output_table(args.TABLE_OUTPUT_NAME)
     my_db_obj.write_sql_function()
-    try:
-        my_db_obj.copy_from(args.FILE_PATH)
-        my_db_obj.calc_deciles(args.TABLE_OUTPUT_NAME)
-    finally:
-        my_db_obj.clean_close()
+
+    my_db_obj.drop_table(args.TABLE_OUTPUT_NAME)  # If table was made in a previous attempt
+
+
+    # Two courses of action, TT or CMLTV
+    # Course 1: TT
+    if args.TT_OR_CMLTV == 'TT':
+
+        my_db_obj.create_table_tt()
+        my_db_obj.create_output_table_tt(args.TABLE_OUTPUT_NAME)
+        try:
+            my_db_obj.copy_from(args.FILE_PATH)
+            my_db_obj.calc_deciles_tt(args.TABLE_OUTPUT_NAME)
+        finally:
+            my_db_obj.clean_close()
+    # Course 2: CMLTV
+    elif args.TT_OR_CMLTV == 'CMLTV':
+        try:
+            destination_types = []
+            with open(args.FILE_PATH, 'r') as f:
+                csvfile = csv.DictReader(f)
+                headers = csvfile.fieldnames
+            destination_types.extend(headers[3:])
+
+            my_db_obj.create_table_cmltv(destination_types)
+            my_db_obj.copy_from(args.FILE_PATH)  # First load in the data
+
+            for dest in destination_types:
+                print(f"Processing deciles for destination: {dest}")
+                # my_db_obj.drop_table(f"{args.TABLE_OUTPUT_NAME}_{dest}")  # This is not suited for iterative table gen
+                my_db_obj.create_output_table_cmltv(f"{args.TABLE_OUTPUT_NAME}_{dest}")
+                my_db_obj.calc_deciles_cmltv(f"{args.TABLE_OUTPUT_NAME}_{dest}", dest)
+        finally:
+            my_db_obj.clean_close()
+    else:
+        print("Invalid input. Must type either 'TT' or 'CMLTV'")

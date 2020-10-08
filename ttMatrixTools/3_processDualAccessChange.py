@@ -5,7 +5,7 @@
 # destinations due to the transportation or land use change implemented in scenario 2.
 
 # Data comes in the form:
-# GEOID10,1,2,3,4,5,6,7,8,9,10
+# BlockID,1,2,3,4,5,6,7,8,9,10
 # 270530267143004,0,1,1,0,0,0,0,1,0,0,0,0
 
 # ---------------------------------
@@ -14,50 +14,113 @@
 
 from datetime import datetime
 import argparse
-import pandas as pd
+import csv
+import itertools
+from progress import bar
 
+
+
+#################################
+#           CLASSES           #
+#################################
+
+class ProgressBar:
+    def __init__(self, lines):
+        self.bar = bar.Bar(message ='Processing', fill='@', suffix='%(percent)d%%', max=lines)
+    def add_progress(self):
+        self.bar.next()
+    def end_progress(self):
+        self.bar.finish()
 # --------------------------
 #       GENERAL FUNCTIONS
 # --------------------------
+
+def make_nested_dict(file):
+    out_dict = {}
+    lines = 0
+    with open(file) as f:
+        reader = csv.DictReader(f,  delimiter = ",")
+        for row in reader:
+            for key, val in row.items():
+                if key == 'origin':
+                    out_dict[val] = {}
+                    origin = val
+                else:
+                    out_dict[origin][key] = int(val)
+            lines += 1
+    return out_dict, lines
+
+def make_fieldnames(output):
+    fieldnames = ['origin']
+    for k, v in output.items():
+        for i, j in v.items():
+            if i not in fieldnames:
+                fieldnames.append(i)
+        break
+    print(f"Fieldnames: {fieldnames}")
+    return fieldnames
 
 if __name__ == '__main__':
     print(datetime.now())
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-bs', '--BASE_FILE', required=True, default=None)  # Baseline scenario dual access file
+    parser.add_argument('-bs_short', '--SHORT_BASE_NAME', required=True, default=None)
     parser.add_argument('-updt', '--UPDATE_FILE', required=True,
                         default=None)  # Modified scneario dual access results file
+    parser.add_argument('-updt_short', '--SHORT_UPDT_NAME', required=True, default=None)
+    parser.add_argument('-other_name', '--OTHER_NAME_TAG', required=False, default=None)
     args = parser.parse_args()
 
     print("Processing results \n")
+    # Nested dictionary from csv file solution found at:
+    # https://medium.com/swlh/how-to-parse-a-csv-to-create-a-nested-dictionary-python-61d5a6934eb9
+    base, lines_bs = make_nested_dict(args.BASE_FILE)
+    updt, lines_updt = make_nested_dict(args.UPDATE_FILE)
 
-    base = pd.read_csv(args.BASE_FILE)
-    base.sort_values("origin", axis=0)
-    column_names = list(base.columns)
-    column_names.remove("origin")
-    print("Column names \n", column_names)
+    output = {}
+    mybar = ProgressBar(lines_bs)
+    for origin, values in base.items():
+        bs_vals = values
+        updt_vals = updt[origin]
+        entry = {}
+        for k, v in bs_vals.items():
+            entry[f"bs_{k}"] = v  # Add the original baseline value to the output
+            entry[f"updt_{k}"] = updt_vals[k]  # Add the alternative scenario values to the output
+            if bs_vals[k] == 2147483647 and updt_vals[k] < 2147483647:
+                entry[f"abschg{k}"] = -6000  # Fill in where tt went from maxtime to reachable
+                entry[f"pctchg{k}"] = -1  # Fill in where tt went from maxtime to reachable
+            elif updt_vals[k] == 2147483647 and bs_vals[k] < 2147483647:
+                entry[f"abschg{k}"] = 6000
+                entry[f"pctchg{k}"] = 1
+            else:
+                entry[f"abschg{k}"] = updt_vals[k] - bs_vals[k]
+                entry[f"pctchg{k}"] = (updt_vals[k] - bs_vals[k]) / bs_vals[k]   # Take the percent difference
+        output[origin] = entry
+        mybar.add_progress()
+    mybar.end_progress()
+
+    fieldnames = make_fieldnames(output)
 
 
-    updt = pd.read_csv(args.UPDATE_FILE)
-    updt.sort_values("origin", axis=0)
+    if args.OTHER_NAME_TAG:
+        with open(f"2_change_{args.SHORT_BASE_NAME}_{args.SHORT_UPDT_NAME}_{args.OTHER_NAME_TAG}.csv", 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter = ',')
+            writer.writeheader()
+            for k,v in output.items():
+                entry = {}
+                entry['origin'] = k
+                entry.update(v)
+                writer.writerow(entry)
 
-    output = pd.DataFrame() # Create empty dataframe
-
-    output["origin"] = base["origin"]  # Other than the origin ID field, all others are added iteratively
-    for i in column_names:
-        output[f"bs_{i}"] = base[f"{i}"]  # Add the original baseline value to the output
-        output[f"updt_{i}"] = updt[f"{i}"]  # Add the alternative scenario values to the output
-        # Abs change
-        output[f"abschg{i}"] = updt[f"{i}"] - base[f"{i}"]  # Take the difference of the scenarios
-        output.loc[output[f'abschg{i}'] < -5401, f'abschg{i}'] = -6000  # Fill in where tt went from maxtime to reachable
-        # Percent change
-        output[f"pctchg{i}"] = (updt[f"{i}"] - base[f"{i}"])/base[f"{i}"]  # Take the percent difference
-        output.loc[output[f'pctchg{i}'] < -0.99999, f'pctchg{i}'] = -1  # Fill in where tt went from maxtime to reachable
-
-
-
-    file_name_base = args.BASE_FILE.replace(".csv", "")
-    file_name_updt = args.UPDATE_FILE.replace(".csv", "")
-    output.to_csv(f"dual_access_change_{datetime.now()}.csv")  # Output file name
+    else:
+        with open(f"2_change_{args.SHORT_BASE_NAME}_{args.SHORT_UPDT_NAME}.csv", 'w') as f: # Output file name
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=',')
+            writer.writeheader()
+            for k, v in output.items():
+                entry = {}
+                entry['origin'] = k
+                entry.update(v)
+                writer.writerow(entry)
 
 
