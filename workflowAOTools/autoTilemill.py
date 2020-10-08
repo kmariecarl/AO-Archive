@@ -3,115 +3,283 @@
 
 
 # This program assumes the user has 1. created the Tilemill project folder from "template"
-# 2. added all layers to "static" and "dynamic" .mss sheets 3. identified the bounding box
+# 2. added all static layers to the "static" sheet, and added access results layers to the project in order for the
+# "dynamic" .mss sheets to find layers based on user input 3. identified and set the bounding box within the project.
+
 # This program should be run from Terminal which is open to the Tilemill project folder.
 # This program will export tilemill .png images into the MapBox/export folder
 
-# * May need to change os.path.exists below
+# If project is not found, you may need to change the hard coded path below
 
 
-# Import subprocess for bash commands
 import subprocess
-
-# Import the os module
 import os
 import csv
+from datetime import datetime
 
 
-def main(project_name, layer_list, zoom, width, height, options):
+def main(project_name, layer_list, zoom, width, height, workflow, options):
 
+    if workflow == 'primal':
+        # ----------For access cost mapping----------
+        # For access cost mapping, $1.50 increments transit + VOT
+        # abs_val_fields = ["rwchg500", "rwchg650", "rwchg800", "rwchg950", "rwchg1100", "rwchg1250", "rwchg1400",
+        #                   "rwchg1550", "rwchg1700", "rwchg1850", "rwchg2000", "rwchg2150", "rwchg2300", "rwchg2450",
+        #                   "rwchg2600", "rwchg2750", "rwchg2900", "rwchg3050"]
 
-    # ----------For access cost mapping----------
-    # For access cost mapping, $1.50 increments transit + VOT
-    # abs_val_fields = ["rwchg500", "rwchg650", "rwchg800", "rwchg950", "rwchg1100", "rwchg1250", "rwchg1400",
-    #                   "rwchg1550", "rwchg1700", "rwchg1850", "rwchg2000", "rwchg2150", "rwchg2300", "rwchg2450",
-    #                   "rwchg2600", "rwchg2750", "rwchg2900", "rwchg3050"]
+        #Use when not dealing with VOT
+        # cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+        #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+        #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+        #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
 
-    #Use when not dealing with VOT
-    # cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
-    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
-    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
-    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000]
+        # For access cost mapping, $0.50 increments for auto + VOT and PNR + VOT
+        # cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
+        #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
+        #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
+        #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200, 3250, 3300,
+        #                        3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
+        #                        4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
+        #                        4950, 5000]
+        # For access cost mapping to add prefix to field names
+        # prefix = ["rwbs", "rwchg"]
+        # abs_val_fields = []
+        # for p in prefix:
+        #     for i in cost_thresh_list:
+        #         fieldstring = f"{p}{i}"
+        #         abs_val_fields.append(fieldstring)
 
-    # For access cost mapping, $0.50 increments for auto + VOT and PNR + VOT
-    # cost_thresh_list = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000,
-    #                        1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1700, 1750,
-    #                        1800, 1850, 1900, 1950, 2000, 2050, 2100, 2150, 2200, 2250, 2300, 2350, 2400, 2450, 2500,
-    #                        2550, 2600, 2650, 2700, 2750, 2800, 2850, 2900, 2950, 3000, 3050, 3100, 3150, 3200, 3250, 3300,
-    #                        3350, 3400, 3450, 3500, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 4050, 4100,
-    #                        4150, 4200, 4250, 4300, 4350, 4400, 4450, 4500, 4550, 4600, 4650, 4700, 4750, 4800, 4850, 4900,
-    #                        4950, 5000]
-    # For access cost mapping to add prefix to field names
-    # prefix = ["rwbs", "rwchg"]
-    # abs_val_fields = []
-    # for p in prefix:
-    #     for i in cost_thresh_list:
-    #         fieldstring = f"{p}{i}"
-    #         abs_val_fields.append(fieldstring)
+        # ----------For access time mapping----------
+        if options[0] == "Y":
+            bs_val_fields = ["wt_bs", "bs_5400", "bs_5100", "bs_4800", "bs_4500",  "bs_4200", "bs_3900", "bs_3600",
+                             "bs_3300", "bs_3000", "bs_2700", "bs_2400", "bs_2100", "bs_1800", "bs_1500", "bs_1200",
+                             "bs_900","bs_600", "bs_300"]
 
-    # ----------For access time mapping----------
-    if options[0] == "Y":
-        abs_val_fields = ["wt_bs", "wt_alt", "bs_5400", "alt_5400", "bs_5100", "alt_5100", "bs_4800", "alt_4800",
-                          "bs_4500", "alt_4500", "bs_4200", "alt_4200", "bs_3900", "alt_3900", "bs_3600", "alt_3600",
-                          "bs_3300", "alt_3300", "bs_3000", "alt_3000", "bs_2700", "alt_2700", "bs_2400", "alt_2400",
-                          "bs_2100", "alt_2100", "bs_1800", "alt_1800", "bs_1500", "alt_1500", "bs_1200", "alt_1200",
-                          "bs_900", "alt_900", "bs_600", "alt_600", "bs_300", "alt_300"]
+            for layer in layer_list:
+                for field in bs_val_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
 
-        for layer in layer_list:
-            for field in abs_val_fields:
-                # Remove any existing dynamic style file
-                if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
-                    os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+                    else:
+                        print("Style file does not exist")
+                    mssAbsVal(layer, field)
+                    renderMap(project_name, layer, field, zoom, width, height,)
+        else:
+            print("Absolute accessibility baseline mapping not selected")
 
-                else:
-                    print("Style file does not exist")
-                mssAbsVal(layer, field)
-                renderMap(project_name, layer, field, zoom, width, height,)
-    else:
-        print("Absolute accessibility mapping not selected")
+        if options[1] == "Y":
+            alt_val_fields = ["wt_alt", "alt_5400", "alt_5100", "alt_4800", "alt_4500",  "alt_4200", "alt_3900", "alt_3600",
+                             "alt_3300", "alt_3000", "alt_2700", "alt_2400", "alt_2100", "alt_1800", "alt_1500", "alt_1200",
+                             "alt_900","alt_600", "alt_300"]
 
-    if options[1] == "Y":
-        abs_chg_fields = ["abschgtmwt", "abschg5400", "abschg5100", "abschg4800", "abschg4500", "abschg4200",
-                          "abschg3900",
-                          "abschg3600", "abschg3300", "abschg3000", "abschg2700", "abschg2400", "abschg2100",
-                          "abschg1800",
-                          "abschg1500", "abschg1200", "abschg900", "abschg600", "abschg300", ]
+            for layer in layer_list:
+                for field in alt_val_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
 
-        for layer in layer_list:
-            for field in abs_chg_fields:
-                # Remove any existing dynamic style file
-                if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
-                    os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+                    else:
+                        print("Style file does not exist")
+                    mssAbsVal(layer, field)
+                    renderMap(project_name, layer, field, zoom, width, height,)
+        else:
+            print("Absolute accessibility alternative mapping not selected")
 
-                else:
-                    print("Style file does not exist")
+        if options[2] == "Y":
+            abs_chg_fields = ["abschgtmwt", "abschg5400", "abschg5100", "abschg4800", "abschg4500", "abschg4200",
+                              "abschg3900",
+                              "abschg3600", "abschg3300", "abschg3000", "abschg2700", "abschg2400", "abschg2100",
+                              "abschg1800",
+                              "abschg1500", "abschg1200", "abschg900", "abschg600", "abschg300", ]
 
-                mssAbsChg(layer, field)
-                renderMap(project_name, layer, field, zoom, width, height,)
-    else:
-        print("Absolute change mapping not selected")
+            for layer in layer_list:
+                for field in abs_chg_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
 
-    if options[2] == "Y":
+                    else:
+                        print("Style file does not exist")
 
-        pct_chg_fields = ["pctchgtmwt", "pctchg5400", "pctchg5100", "pctchg4800", "pctchg4500", "pctchg4200", "pctchg3900",
-                          "pctchg3600", "pctchg3300", "pctchg3000", "pctchg2700", "pctchg2400", "pctchg2100", "pctchg1800",
-                          "pctchg1500", "pctchg1200", "pctchg900", "pctchg600", "pctchg300"]
+                    mssAbsChg(layer, field)
+                    renderMap(project_name, layer, field, zoom, width, height,)
+        else:
+            print("Absolute change mapping not selected")
 
-        for layer in layer_list:
-            for field in pct_chg_fields:
-                # Remove any existing dynamic style file
-                if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
-                    os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+        if options[3] == "Y":
 
-                else:
-                    print("Style file does not exist")
+            pct_chg_fields = ["pctchgtmwt", "pctchg5400", "pctchg5100", "pctchg4800", "pctchg4500", "pctchg4200", "pctchg3900",
+                              "pctchg3600", "pctchg3300", "pctchg3000", "pctchg2700", "pctchg2400", "pctchg2100", "pctchg1800",
+                              "pctchg1500", "pctchg1200", "pctchg900", "pctchg600", "pctchg300"]
 
-                mssPctChg(layer, field)
-                renderMap(project_name, layer, field, zoom, width, height,)
-    else:
-        print("Percent change mapping not selected")
+            for layer in layer_list:
+                for field in pct_chg_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
 
+                    else:
+                        print("Style file does not exist")
 
+                    mssPctChg(layer, field)
+                    renderMap(project_name, layer, field, zoom, width, height,)
+        else:
+            print("Percent change mapping not selected")
+
+    # ----Dual Access Workflow----
+    if workflow == 'dual':
+
+        if options[0] == "Y":
+            bs_val_fields = ["bs_1", "bs_2", "bs_3", "bs_4", "bs_5", "bs_6", "bs_7", "bs_8", "bs_9", "bs_10"]
+            for layer in layer_list:
+                for field in bs_val_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+                    else:
+                        print("Style file does not exist")
+                    mssDualAbsVal(layer, field)
+                    renderDualMap(project_name, layer, field, zoom, width, height,)
+        else:
+            print("Absolute accessibility baseline mapping not selected")
+
+        if options[1] == "Y":
+            alt_val_fields = ["alt_1", "alt_2", "alt_3", "alt_4", "alt_5", "alt_6", "alt_7", "alt_8", "alt_9", "alt_10"]
+            for layer in layer_list:
+                for field in alt_val_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+                    else:
+                        print("Style file does not exist")
+                    mssDualAbsVal(layer, field)
+                    renderDualMap(project_name, layer, field, zoom, width, height, )
+        else:
+            print("Absolute accessibility alternative mapping not selected")
+
+        if options[2] == "Y":
+            abs_chg_fields = ["abschg1", "abschg2", "abschg3", "abschg4", "abschg5",
+                              "abschg6", "abschg7", "abschg8", "abschg9", "abschg10"]
+
+            for layer in layer_list:
+                for field in abs_chg_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+                    else:
+                        print("Style file does not exist")
+
+                    mssDualAbsChg(layer, field)
+                    renderDualMap(project_name, layer, field, zoom, width, height,)
+        else:
+            print("Absolute change mapping not selected")
+
+        if options[3] == "Y":
+
+            pct_chg_fields = ["pctchg1", "pctchg2", "pctchg3", "pctchg4", "pctchg5",
+                              "pctchg6", "pctchg7", "pctchg8", "pctchg9", "pctchg10"]
+
+            for layer in layer_list:
+                for field in pct_chg_fields:
+                    # Remove any existing dynamic style file
+                    if os.path.exists(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss'):
+                        os.remove(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss')
+
+                    else:
+                        print("Style file does not exist")
+
+                    mssDualPctChg(layer, field)
+                    renderDualMap(project_name, layer, field, zoom, width, height,)
+        else:
+            print("Percent change mapping not selected")
+
+def mssDualAbsVal(layer, field):
+    with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
+        spamwriter = csv.writer(csvfile)
+        style = f"""#{layer} {{
+        line-width: 0;
+        polygon-opacity: 1;
+        [{field}=null]{{polygon-fill:#ffffff;}}
+        [{field}>=0]{{polygon-fill:#f9f871;}} 
+        [{field}>=300]{{polygon-fill:#ecbc77;}}
+        [{field}>=600]{{polygon-fill:#df7b7d;}}
+        [{field}>=1200]{{polygon-fill:#a65182;}}
+        [{field}>=2400]{{polygon-fill:#423e85;}}
+        [{field}>=3600]{{polygon-pattern-file:url(/Users/kristincarlson/Documents/MapBox/project/TIRP/images/hatch_abs.png);}}
+        }}"""
+        style_split = style.splitlines()
+
+        for row in style_split:
+            print(row)
+
+            spamwriter.writerow([row])
+
+def mssDualAbsChg(layer, field):
+    # here values of change >= 3600 are colored white
+    # because polygons with this value in tilemill are
+    # missing and otherwise would be colored dark red
+    with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
+        spamwriter = csv.writer(csvfile)
+        style = f"""#{layer} {{
+        line-width: 0;
+        polygon-opacity: 1;
+        [{field}=null]{{polygon-fill:#ffffff;}}
+        [{field}=-6000]{{polygon-pattern-file:url(/Users/kristincarlson/Documents/MapBox/project/TIRP/images/hatch_abschg.png);}} 
+        [{field}>=-3600]{{polygon-fill:#26244e;}}
+        [{field}>=-2400]{{polygon-fill:#4a468a;}}
+        [{field}>=-1200]{{polygon-fill:#7472a6;}}
+        [{field}>=-600]{{polygon-fill:#a19fc2;}}
+        [{field}>=-300]{{polygon-fill:#cfcee0;}}
+        [{field}>=-30]{{polygon-fill:#f7f7f7;}}
+        [{field}=0]{{polygon-fill:#f7f7f7;}}
+        [{field}>0]{{polygon-fill:#f7f7f7;}}
+        [{field}>=60]{{polygon-fill:#e7c7d4;}}
+        [{field}>=300]{{polygon-fill:#d090a9;}}
+        [{field}>=600]{{polygon-fill:#b8577d;}}
+        [{field}>=1200]{{polygon-fill:#9a1047;}}
+        [{field}>=2400]{{polygon-fill:#590023;}}
+        [{field}>=3600]{{polygon-fill:#f7f7f7;}}
+        }}"""
+        style_split = style.splitlines()
+
+        for row in style_split:
+            print(row)
+
+            spamwriter.writerow([row])
+
+def mssDualPctChg(layer, field):
+    with open(f'/Users/kristincarlson/Documents/MapBox/project/{project_name}/dynamic.mss', 'w', newline='') as csvfile:
+        spamwriter = csv.writer(csvfile)
+        style = f"""#{layer} {{
+        line-width: 0;
+        polygon-opacity: 1;
+        [{field}=null]{{polygon-fill:#ffffff;}}
+        [{field}=-1]{{polygon-pattern-file:url(/Users/kristincarlson/Documents/MapBox/project/TIRP/images/hatch_abschg.png);}} 
+        [{field}>=-0.99]{{polygon-fill:#26244e;}}
+        [{field}>=-0.4]{{polygon-fill:#4a468a;}}
+        [{field}>=-0.2]{{polygon-fill:#7472a6;}}
+        [{field}>=-0.1]{{polygon-fill:#a19fc2;}}
+        [{field}>=-0.05]{{polygon-fill:#cfcee0;}}
+        [{field}>=-0.005]{{polygon-fill:#f7f7f7;}}
+        [{field}=0]{{polygon-fill:#f7f7f7;}}
+        [{field}>0]{{polygon-fill:#f7f7f7;}}
+        [{field}>=0.005]{{polygon-fill:#e7c7d4;}}
+        [{field}>=0.05]{{polygon-fill:#d090a9;}}
+        [{field}>=0.1]{{polygon-fill:#b8577d;}}
+        [{field}>=0.2]{{polygon-fill:#9a1047;}}
+        [{field}>=0.4]{{polygon-fill:#590023;}}
+        [{field}>=0.99]{{polygon-fill:#f7f7f7;}}
+        }}"""
+        style_split = style.splitlines()
+
+        for row in style_split:
+            print(row)
+
+            spamwriter.writerow([row])
 
 
 def mssAbsVal(layer, field):
@@ -386,7 +554,14 @@ def renderMap(project_name, layer, field, zoom, width, height,):
     p4 = subprocess.Popen(bash_command, shell=True)
     p4.communicate()
 
+# The only difference is '_TT_' is part of the file name
+def renderDualMap(project_name, layer, field, zoom, width, height,):
 
+    os.chdir('/Users/kristincarlson/Applications/TileMill.app/Contents/Resources')
+    bash_command = f'./index.js export {project_name} ~/Documents/MapBox/export/{project_name}_TT_{layer}_{field}.png --format=png --width={width} ' \
+                   f'--height={height} --static_zoom={zoom} --verbose'
+    p4 = subprocess.Popen(bash_command, shell=True)
+    p4.communicate()
 
 
 if __name__ == '__main__':
@@ -394,16 +569,28 @@ if __name__ == '__main__':
     # Get user input
     project_name = input("Enter project name: ")
 
-    abs_switch = input("Make absolute accessibility maps? (Y/N) ")
-    chg_switch = input("Make absolute CHANGE accessibility maps? (Y/N) ")
-    pct_switch = input("Make PERCENT change accessibility maps? (Y/N) ")
+    workflow = input("Enter workflow, access to jobs (primal) OR access to non-work destinations (dual): ")
+    if workflow == 'primal':
+        bs_switch = input("Make cumulative accessibility to jobs baseline maps? (Y/N) ")
+        alt_switch = input("Make cumulative accessibility to jobs alternative maps? (Y/N) ")
+        chg_switch = input("Make absolute CHANGE accessibility to jobs maps? (Y/N) ")
+        pct_switch = input("Make PERCENT change accessibility to jobs maps? (Y/N) ")
+        options = [bs_switch, alt_switch, chg_switch, pct_switch]
+    elif workflow == 'dual':
+        bs_switch = input("Make access to non-work destinations baseline maps? (Y/N) ")
+        alt_switch = input("Make access to non-work destinations alternative maps? (Y/N) ")
+        chg_switch = input("Make absolute CHANGE to non-work destinations maps? (Y/N) ")
+        pct_switch = input("Make PERCENT change to non-work destinations maps? (Y/N) ")
+        options = [bs_switch, alt_switch, chg_switch, pct_switch]
+    else:
+        print("Please enter 'primal' or 'dual'")
+        options = [None]
 
-    options = [abs_switch, chg_switch, pct_switch]
-
-    zoom = input("Type zoom level 1-30: ")
+    zoom = input("Type zoom level 1-30 (12): ") or 12
     width = input("Enter width in pixels (1600): ") or 1600
     height = input("Enter height in pixels (1600): ") or 1600
 
+    print("Note: Default zoom: 12")
     print("Note: Default image dimensions: 1600 pxl X 1600 pxl")
 
     layer_list = []
@@ -418,6 +605,8 @@ if __name__ == '__main__':
     print("Layer list: ", layer_list)
 
 
-    main(project_name, layer_list, zoom, width, height, options)
+    main(project_name, layer_list, zoom, width, height, workflow, options)
+    print(datetime.now())
+    os.system('say "mapping complete"')
 
 
