@@ -9,6 +9,7 @@ import sys
 import argparse
 import pandas as pd
 from myToolsPackage import matrixLinkModule as mod
+from datetime import datetime
 
 
 # --------------------------
@@ -16,7 +17,7 @@ from myToolsPackage import matrixLinkModule as mod
 # --------------------------
 
 def main():
-    start, curtime = mod.startTimer()
+    print(datetime.now())
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-access', '--ACCESS_FILE', required=True, default=None)
@@ -52,8 +53,6 @@ def main():
     file_name = str(sys.argv[2]).replace(".csv", "")
 
     access_halfm_write.to_csv(f'{file_name}-halfm.csv', index=None, header=header)
-
-
 
 
 if __name__ == '__main__':
