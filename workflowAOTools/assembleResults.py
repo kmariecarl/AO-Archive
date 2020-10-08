@@ -141,14 +141,7 @@ class AccessFile:
 
 # Solution from https://stackoverflow.com/questions/32510464/using-subprocess-to-get-output
 def run_command(bash_command):
-    # process = subprocess.Popen(bash_command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    # output, error = process.communicate()
-    # print(error)
-    # print(output)
-
     subprocess.Popen(bash_command.split(), stdout=sys.stdout, stderr=sys.stderr).communicate() # stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-
 
 # Solution from https://kite.com/python/examples/4293/os-get-the-relative-paths-of-all-files-and-subdirectories-in-a-directory
 def find_file(string):
