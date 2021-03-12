@@ -1,3 +1,6 @@
+# TIRP non-work destination workflow
+# This is a supporting script of the dual access workflow
+
 # This program calculates the percent and absolute difference between dual accessibility scenarios.
 
 # Example use: Dual access to 1–10 grocery destinations for scenario 1 compared to dual access to 1–10 grocery
@@ -102,7 +105,7 @@ if __name__ == '__main__':
 
     fieldnames = make_fieldnames(output)
 
-
+    # Function helps create distinct names for future programs to decipher between scenarios
     if args.OTHER_NAME_TAG:
         with open(f"2_change_{args.SHORT_BASE_NAME}_{args.SHORT_UPDT_NAME}_{args.OTHER_NAME_TAG}.csv", 'w') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter = ',')

@@ -1,3 +1,6 @@
+# TIRP non-work destination workflow
+# This is a supporting script of the dual access workflow
+
 # This program optionally loads POI data to Postgres database then forces computation of the dual
 # accessibility (how long to reach 1, 2, 3, 10 destinations of type X). Output format should be a .csv
 
@@ -148,8 +151,6 @@ def calc_dual(poi_view, percentile, o_list, limit, cursor):
         entry = {'origin': origin}
         if origin in set_dict:
             for tup in set_dict[origin]:
-            # for s in set:
-            #     if origin == s[0]:
                 count = 0
                 number_of_pois_in_block = tup[1]
                 while count < number_of_pois_in_block:
@@ -261,18 +262,9 @@ if __name__ == '__main__':
                 create_poi_table(poi_tab, column_str, cursor)
                 load_poi_table(poi_tab, args.POI_FILE_PATH, cursor)
 
-            # Create db object for the deciles and poi tables that are about to be joined --removing this 6/16/20
-            # tt_poi_tab = DBObject(args.DB_NAME, args.SCHEMA_NAME, f"{tt_tab.table}_poi")
-            # Join the deciles and poi tables and assign to the tt_poi_tab object
-            # join_tables(tt_tab, poi_tab, tt_poi_tab, percentile, cursor) # Comment this out for repeated testing
-            # poi_list, poi_column = user_input_poi(args.SINGLE_OR_MULTIPLE)  # Create vars for single or multi poi fields.
-                                                # enter 1 or more, prepare space separated string of fieldnames for muliple
-            # if len(poi_list) > 1:
             view_name = make_view(tt_tab, poi_tab, percentile, block_id)
             # Create db object for newly created view
             poi_view = DBObject(args.DB_NAME, args.SCHEMA_NAME, view_name)
-            # else:
-            #     poi_view = tt_poi_tab  # If there are no special categories, assign calc_dual parameter to tt_poi_tab
 
             o_list = select_distinct(poi_view, cursor)
             results = {}
@@ -282,6 +274,8 @@ if __name__ == '__main__':
             calc_dual(poi_view, percentile, o_list, limit, cursor)
             cursor.close()
 
+    # Course 2: CMLTV
+    # This is an experimental course that was ultimately not used in the final TIRP resutls
     elif args.TT_OR_CMLTV == 'CMLTV':
         tt_tab = DBObject(args.DB_NAME, args.SCHEMA_NAME, args.DECILES_TABLE_NAME)
         # Connect to db

@@ -1,4 +1,6 @@
+# TIRP non-work destination workflow
 # This is a supporting script of the dual access workflow
+
 # This script reads in processed_results file and a blocks within a half mile of transit stops file, and returns a file
 # with only the blocks and results for the blocks within a half mile.
 

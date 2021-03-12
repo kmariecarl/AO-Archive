@@ -1,3 +1,5 @@
+# TIRP non-work destination workflow
+
 # This program reads in csv files from dual2_assembleResults.py along with the
 # LEHD RAC values to begin aggregating the dual accessibility results over the metro worker population by different
 # worker groups, i.e. racC000, racCA01, racCA02, etc.
@@ -5,6 +7,10 @@
 # NOTE: User must have a demographics.json file prepared for the configuration of worker groups and output csv files.
 # The demographics.json file should be in the folder this program is run out of.
 # See: /Users/kristincarlson/Dropbox/AO_Projects/TIRP/2_Dual/BDE/demographics.json
+
+# NOTE: Aggregation statistics do not include travel time changes for blocks that were less than 1 minute, as of
+# 11/02/2020 the autoTilemill_v2.py script maps change for < -30 and > 60 seconds which does not line up perfectly with
+# the desired setup here.
 
 #################################
 #           IMPORTS             #
@@ -18,6 +24,7 @@ import json
 import csv
 import fnmatch
 import operator
+from numpy import average
 
 
 
@@ -81,17 +88,17 @@ class FolderObject:
             prefix = [x for x in file.split('_')[2:4]]  #grabs the scenarios included in the file name, 'base', 'bde'
             file_str = f"{self.dir}{self.scenario_name}/{file}"
             data = self.load_data(file_str, prefix)
-            for name, rac_group in demo_config.items():  # new file should be generated for each 'name'
+            for name, rac_group in demo_config.items():
                 out[f'{name}'] ={}
                 for rac_field, rac_text in rac_group.items():
-                    rac_total = total_rac(data, rac_field, rac_dict, s)
+                    rac_total = total_rac(data, rac_field, rac_dict)
                     out[f'{name}'][f'{rac_text}'] = rac_total
             write_demographics(self.dir, self.scenario_name, file, out, p)
 
     # output data should be:
     # [base,age,<=29,8,15,22,60]
     # [bde,age,<=29,7,14,20,60]
-    def calc_rac_quartiles(self, subsets, rac_dict, demo_config, dest_num, p):
+    def calc_rac_percentiles(self, subsets, rac_dict, demo_config, dest_num, p):
         for s in subsets:  # e.x. METRO, BLINE, DLINE, ELINE
             out = {}
             file = find_file(f"3_*_{p}_{s}_*.csv")
@@ -103,42 +110,49 @@ class FolderObject:
                     out[f'{prx}'] = {}
                     out[f'{prx}'][name] = {}
                     for rac_field, rac_text in rac_group.items():
-                        rac_total = total_rac(data, rac_field, rac_dict, s)
-                        quart_dict = make_quartiles(rac_total)
+                        rac_total = total_rac(data, rac_field, rac_dict)
+                        tile_dict = make_percentiles(rac_total)
                         out[f'{prx}'][name][f"{rac_text}"] = {}
                         tup_list = []
                         for k, v in data.items():
                             if k in rac_dict.keys():  # In case water bodies were included in original set of origins
                                 tup_list.append((data[k][f'{prx}_{dest_num}'], rac_dict[k][rac_field]))  # appending the tt found in the baseline_2 dest and the matching rac value
                         tup_list.sort(key=operator.itemgetter(0))  # sort tuple order by travel time
+                        # calculate overall average tt for each worker group
+                        avg = calc_avg_tt(tup_list)
+                        out[f'{prx}'][name][f"{rac_text}"]["Average"] = avg
                         # select quartile, search tuple list until the sum of the rac values equals or exceeds the quartile
-                        for q_name, q in quart_dict.items():
+                        for tile_name, tile_val in tile_dict.items():
                             rac_sum = 0
                             for i in tup_list:  # i is the travel time
                                 rac_sum = rac_sum + i[1]
-                                if rac_sum >= q:
+                                if rac_sum >= tile_val:
                                     # tt value needed for 25%, etc. of workers to reach 1 grocery on the baseline network...
-                                    out[f'{prx}'][name][f"{rac_text}"][q_name] = int(i[0]/60)  #convert to minutes and round to nearest int
+                                    out[f'{prx}'][name][f"{rac_text}"][tile_name] = int(i[0]/60)  #convert to minutes and round to nearest int
                                     break
-                write_quartiles(self.dir, self.scenario_name, file, name, out, p)
-                print(f"Wrote rac quartile travel times for {name} worker group and file: ", file)
+                write_percentiles(self.dir, self.scenario_name, file, name, out, p)
+                print(f"Wrote rac percentile travel times for {name} worker group and file: ", file)
+
 
     # output data should be:
-    # [age, <=29, -5min, -10min, -15min, +5min, +10min, +15min]
-    # [age, 30–54, 1, 450 (27%), 20 (0.1%), 2 (0.01%), 49 (13%), 15 (4%), 1 (0.3%)]
+    # [age, <=29, Total workers, -5min, -10min, -15min, +5min, Average change (min)]
+    # [age, 30–54, Total workers, 1, 450 (27%), 20 (0.1%), 2 (0.01%), 49 (13%), 15 (4%), 1 (0.3%), Average change (min)]
     # [age, ...]
     def calc_rac_impact(self, subsets, rac_dict, demo_config, dest_num, p):
         for s in subsets:  # e.x. METRO, BLINE, DLINE, ELINE
             file = find_file(f"3_*_{p}_{s}_*.csv")
-            prefix = [x for x in file.split('_')[2:4]]  # grabs the scenarios included in the file name, 'base', 'bde'
+            prefix = [x for x in
+                      file.split('_')[2:4]]  # grabs the scenarios included in the file name, 'base', 'bde'
             file_str = f"{self.dir}{self.scenario_name}/{file}"
             data = self.load_data(file_str, prefix)
-            for name, rac_group in demo_config.items():  # new file should be generated for each 'name'
+            for name, rac_group in demo_config.items():  # new file should be generated for each 'name', i.e. age, earnings, education. And enumerate lines in file by "rac_group" i.e rCA01, rCA02,etc.
                 out = {}
                 out[name] = {}
                 for rac_field, rac_text in rac_group.items():
-                    rac_total = total_rac(data, rac_field, rac_dict, s)
+                    rac_total = total_rac(data, rac_field, rac_dict)
                     out[name][f"{rac_text}"] = {}
+                    rac_sum_neg_total = 0
+                    rac_sum_pos_total = 0
                     # sum all rac associated with blocks that changed by +0–5 min, -0–5 min, etc
                     tt_buckets = [300, 600, 900]
                     for tt in tt_buckets:
@@ -147,10 +161,10 @@ class FolderObject:
                         for origin in data.keys():
                             if origin in rac_dict.keys():  # rac_dict does not contain water body origins, so this checks removes water bodies from the access impact calculations
                                 if tt == 300:  # The first bucket should be adjusted to 1–5 minutes (showing less than 1 min change isn't useful)
-                                    # Look for negative tt change between the range given, i.e. -60 – -300
+                                    # Look for negative tt change between the range given, i.e. -60 – -300, -300 – -600
                                     if data[origin][f'abschg{dest_num}'] < ((tt + 60) * -1) + 300 and data[origin][f'abschg{dest_num}'] >= tt * -1:
                                         rac_sum_neg = rac_sum_neg + rac_dict[origin][rac_field]
-                                    # Look for positive tt change between the range given, i.e. -300 – -600
+                                    # Look for positive tt change between the range given, i.e. 60–300,  300–600
                                     if data[origin][f'abschg{dest_num}'] > (tt + 60) - 300 and data[origin][f'abschg{dest_num}'] <= tt:
                                         rac_sum_pos = rac_sum_pos + rac_dict[origin][rac_field]
                                 else:
@@ -160,8 +174,15 @@ class FolderObject:
                                     # Look for positive tt change between the range given, i.e. -300 – -600
                                     if data[origin][f'abschg{dest_num}'] > tt - 300 and data[origin][f'abschg{dest_num}'] <= tt:
                                         rac_sum_pos = rac_sum_pos + rac_dict[origin][rac_field]
-                        out[name][f"{rac_text}"][f'{int(tt/60)} min closer'] = f"{rac_sum_neg:,}" + " (" + f"{round((rac_sum_neg/rac_total)*100, 2)}" + "%)"
-                        out[name][f"{rac_text}"][f'{int(tt/60)} min farther'] = f"{rac_sum_pos:,}" + " (" + f"{round((rac_sum_pos/rac_total)*100, 2)}" + "%)"
+                        out[name][f"{rac_text}"][f'{int(tt / 60)} min closer'] = f"{round((rac_sum_neg / rac_total) * 100, 1)}" + "%"
+                        out[name][f"{rac_text}"][f'{int(tt / 60)} min farther'] = f"{round((rac_sum_pos / rac_total) * 100, 1)}" + "%"
+                        rac_sum_neg_total = rac_sum_neg_total + rac_sum_neg
+                        rac_sum_pos_total = rac_sum_pos_total + rac_sum_pos
+                    out[name][f"{rac_text}"]["No change"] = f"{round((1 - (rac_sum_neg_total / rac_total) - (rac_sum_pos_total / rac_total)) * 100, 1)}" + "%"
+                    out[name][f"{rac_text}"]["Total workers"] = f"{rac_total:,}"
+                    out[name][f"{rac_text}"]["Total closer"] = f"{round((rac_sum_neg_total / rac_total) * 100, 1)}" + "%"
+                    out[name][f"{rac_text}"]["Total farther"] = f"{round((rac_sum_pos_total / rac_total) * 100, 1)}" + "%"
+                    out[name][f"{rac_text}"]["Average change (min)"] = calc_avg_chg_tt(data, rac_dict, rac_field, dest_num)  # calculate the average tt change for only the blocks that experience chnage, i.e. exclude "no change"
                 write_rac_impact(self.dir, self.scenario_name, file, name, out, p)
 
 
@@ -169,6 +190,7 @@ class FolderObject:
 #################################
 #           FUNCTIONS           #
 #################################
+
 def make_lists(input):
     out = []
     for i in input:
@@ -241,13 +263,18 @@ def load_rac(rac):
                     rac_dict[row[f"{column_names[0]}"]][c] =int(row[f"{c}"])
     return rac_dict
 
-def total_rac(data, rac_field, rac_dict, s):
+def total_rac(data, rac_field, rac_dict):
     # Only count workers that are in the analysis area and in the worker group specified by rac_field
     total = 0
-    for k, v in data.items():
+    null_origins = 0
+    for k, v in data.items():  # go through all origins in the dual access results
         if k in rac_dict.keys():  # In case the calculations were originally done with water bodies in the origins
             total = total + rac_dict[k][rac_field]
+        else:
+            null_origins += 1
+            # print(f"origin {k} not in rac_dict keys")
     # print(f"Total workers of group {rac_field} found in analysis region {s}: {total}")
+    # print(f"origins with access data area is mostly comprised of water: {null_origins}")
     return total
 
 # This group_dict does not have headers
@@ -260,14 +287,50 @@ def load_group_data(id, group_data_path):
     return out
 
 
-def make_quartiles(total_rac):
-    qt = {'25%': 0.25 * total_rac, '50%': 0.50 * total_rac, '75%': 0.75 * total_rac, '95%': 0.95 * total_rac}
-    return qt  # return dictionary of keys and values
+def make_percentiles(total_rac):
+    pt = {'10%': 0.10 * total_rac,
+          '25%': 0.25 * total_rac,
+          '50%': 0.50 * total_rac,
+          '75%': 0.75 * total_rac,
+          '90%': 0.90 * total_rac}
+    return pt  # return dictionary of keys and values
+
+# Calculates the worker-weighted average tt for blocks where traveltimes are reachable, ww-avg. is different than
+# the median (50% of workers).
+def calc_avg_tt(tup_list):
+    tt_list = []
+    rac_list = []
+    for tup in tup_list:
+        # WARNING: Clause tup[0] <= 5400 removes all unreachable traveltimes from the average,
+        # this is okay with a footnote describing that fact.
+        if tup[0] <= 5400:
+            tt_list.append(tup[0])
+            rac_list.append(tup[1])
+    # note: int() rounds down, even when the value is 3.9 it is assigned 3.
+    # note: the ww-avg tt from this function around rounded which tends to obscure tt changes of 0.1–0.9 minutes, remember this
+    # when reporting results because the individual percentile values may change but the ww-avg tt appears not to even though it might have
+    # dropped by 0.1–0.9 minutes.
+    avg = int(average(tt_list, weights=rac_list) / 60)
+    return avg
+
+# calculates the average worker-weighted change in tt for blocks (excluding change < 1min)
+def calc_avg_chg_tt(data, rac_dict, rac_field, dest_num):
+    tt_list = []
+    rac_list = []
+    for origin in data.keys():
+        if origin in rac_dict.keys():
+            # do not include change less than 1 min
+            if data[origin][f'abschg{dest_num}'] < -60 or data[origin][f'abschg{dest_num}'] > 60:
+                tt_list.append(data[origin][f'abschg{dest_num}'])
+                rac_list.append(rac_dict[origin][rac_field])
+    avg_chg = round((average(tt_list, weights=rac_list) / 60), 1)
+    return avg_chg
+
 
 def write_demographics(dir, scenario_name, file, out, p):
     name_out0 = file.replace('3_', '5_')
     name_out = name_out0.replace('.csv', "")
-    fieldnames = ['Category','Division', 'Population']  # hard code the fieldnames
+    fieldnames = ['Category','Division', 'Total Workers']  # hard code the fieldnames
     with open(f"{dir}{scenario_name}/5_{p}/{name_out}_demographics.csv", 'w', newline='') as csvout:
         writer = csv.DictWriter(csvout, fieldnames=fieldnames)
         writer.writeheader()
@@ -276,13 +339,13 @@ def write_demographics(dir, scenario_name, file, out, p):
                 entry = {}
                 entry['Category'] = k1  # Add the scenario name to output
                 entry['Division'] = k2  # Add the demographic group name to output
-                entry['Population'] = f"{v2:,}"
+                entry['Total Workers'] = f"{v2:,}"
                 writer.writerow(entry)
 
-def write_quartiles(dir, scenario_name, file, group_name, out, p):
+def write_percentiles(dir, scenario_name, file, group_name, out, p):
     name_out0 = file.replace('3_', '5_')
     name_out = name_out0.replace('.csv', "")
-    fieldnames = ['Scenario',f'{group_name}', '25%', '50%','75%','95%']  # hard code the fieldnames
+    fieldnames = ['Scenario',f'{group_name}', '10%', '25%', '50%', '75%', '90%', "Average"]  # hard code the fieldnames
     with open(f"{dir}{scenario_name}/5_{p}/{name_out}_{group_name}.csv", 'w', newline='') as csvout:
         writer = csv.DictWriter(csvout, fieldnames=fieldnames)
         writer.writeheader()
@@ -298,8 +361,8 @@ def write_quartiles(dir, scenario_name, file, group_name, out, p):
 def write_rac_impact(dir, scenario_name, file, group_name, out, p):
     name_out0 = file.replace('3_', '5_')
     name_out = name_out0.replace('.csv', "")
-    fieldnames = [f'{group_name}', '15 min closer', '10 min closer', '5 min closer',
-                  '5 min farther', '10 min farther', '15 min farther']
+    fieldnames = [f'{group_name}', 'Total workers', '15 min closer', '10 min closer', '5 min closer', 'No change',
+                  '5 min farther', 'Total closer', 'Total farther', 'Average change (min)']  # On 10/29/20 removed '10 min farther', '15 min farther'
     with open(f"{dir}{scenario_name}/5_{p}/{name_out}_{group_name}_impact.csv", 'w', newline='') as csvout:
         writer = csv.DictWriter(csvout, fieldnames=fieldnames)
         writer.writeheader()
@@ -307,7 +370,7 @@ def write_rac_impact(dir, scenario_name, file, group_name, out, p):
             for k2, v2 in v1.items():
                 entry = {}
                 entry[f'{group_name}'] = k2
-                v2_reorder = {x: v2[x] for x in fieldnames[1:]}  # reorder output dictionary based on fieldname order
+                v2_reorder = {x: f"{v2[x]}" for x in fieldnames[1:]}  # reorder output dictionary based on fieldname order
                 entry.update(v2_reorder)
                 writer.writerow(entry)
 
@@ -374,11 +437,11 @@ if __name__ == '__main__':
             f.make_dirs(pois)
             for p in pois:  # All of the aggregations are repeated separately for each POI type
                 f.make_demographics_table(subsets, rac_dict, demo_config)
-                f.calc_rac_quartiles(subsets, rac_dict, demo_config, dest_num, p)
+                f.calc_rac_percentiles(subsets, rac_dict, demo_config, dest_num, p)
                 f.calc_rac_impact(subsets, rac_dict, demo_config, dest_num, p)
             f.move_outof_folder()
 
     print(f"-----Aggregation Complete----- \n")
     print(datetime.now())
-    os.system('say "Aggregation complete"')
+    os.system('say "Demographic aggregation complete"')
 

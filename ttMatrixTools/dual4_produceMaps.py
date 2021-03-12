@@ -1,3 +1,5 @@
+# TIRP non-work destination workflow
+
 # This script takes maps generated using the autoTilemill.py script and existing legends to produce final images with
 # map, legend, and title.
 

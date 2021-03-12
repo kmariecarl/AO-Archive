@@ -1,3 +1,5 @@
+# TIRP non-work destination workflow
+
 # This program is designed to create a sequence of scenario evaluation folders based on input from the user, this
 # program will also run the jobs through AWS
 
@@ -116,7 +118,7 @@ def make_folders_w_cats(time_periods, scenarios, categories, exclude):
     return folders
 
 def write_folder_list(folders):
-    # Write folder names out to json file to read into 'assembleResults2.py'
+    # Write folder names out to json file to read into 'dual2_assembleResults.py'
     outdict = {}
     for i in range(0, len(folders), 1):
         outdict[i] = folders[i].folder_name
@@ -254,7 +256,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print("---Notes about this program---")
-    print("-0-Watch this program until the first job has started to successfull by calculated")
+    print("-0-Watch this program until the first job has started to be successfully calculated")
     print("-0-Turn on AWS instance prior to running this program")
     print("\n")
 
@@ -282,6 +284,7 @@ if __name__ == '__main__':
 
         folders = make_folders_w_cats(time_periods, scenarios, categories, exclude)
         folders_w_cats(folders, scenarios, categories, analyzer_str)
+    # In later runs of TIRP project, ADDITIONAL_CATEGORIES was always N
     else:
         analyzer_str = '/Users/kristincarlson/Dropbox/AOGit/Analyzer/myAnalyzer/analyzer.sh'
 

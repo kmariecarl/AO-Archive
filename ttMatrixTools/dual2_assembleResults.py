@@ -1,5 +1,7 @@
+# TIRP non-work destination workflow
+
 # This program follows the 'generateScenarios.py' script and prepares the raw results files for processing. The program
-# is currently written to acommodate only the TT dual access workflow. For the primal accessibility workflow, please
+# is currently written to accommodate only the TT dual access workflow. For the primal accessibility workflow, please
 # use 'assembleResults.py'
 
 
@@ -102,6 +104,7 @@ def run_command(bash_command):
     except subprocess.TimeoutExpired:
         proc.kill()
         outs, errs = proc.communicate()
+
 #################################
 #           OPERATIONS          #
 #################################
@@ -137,15 +140,15 @@ if __name__ == '__main__':
         for key, name in folder_names.items():
             folder_list.append(FolderObject(dir, name))
 
-    # mybar = ProgressBar(len(folder_list))
-    # for f in folder_list:
-    #     f.unzip_BZ2()  # Uncomment after finishing Gold Rush work
-    #     f.summarize_results()
-    #     f.calc_dual_access(pois)  # This should complete before running comparisons
-    #     mybar.add_progress()
-    #     print(f"\n -----Scenario {f.scenario_name} finished processing----- \n")
-    # mybar.end_progress()
-    # print("\n -----All scenarios have been loaded, deciles calculated, and dual accessibility calculated----- \n")
+    mybar = ProgressBar(len(folder_list))
+    for f in folder_list:
+        f.unzip_BZ2()  # Uncomment after finishing Gold Rush work
+        f.summarize_results()
+        f.calc_dual_access(pois)  # This should complete before running comparisons
+        mybar.add_progress()
+        print(f"\n -----Scenario {f.scenario_name} finished processing----- \n")
+    mybar.end_progress()
+    print("\n -----All scenarios have been loaded, deciles calculated, and dual accessibility calculated----- \n")
 
     # Provide file input to tell the program which scenarios should be compared
     with open(f'{dir}/comparisons.csv') as csv_file:

@@ -1,3 +1,6 @@
+# TIRP non-work destination workflow
+# This is a supporting script of the dual access workflow
+
 # This program optionally loads POI data to Postgres database then forces computation of the dual
 # accessibility (how long to reach 1, 2, 3, 10 destinations of type X). Output format should be a .csv
 

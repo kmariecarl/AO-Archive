@@ -1,6 +1,8 @@
+# TIRP non-work destination workflow
 # This is a supporting script of the dual access workflow
+
 # This is a stand alone program that takes a csv of IDs and counts and puts them into the db for
-# use with the 'assembleResults2.py' program.
+# use with the 'dual2_assembleResults.py' program.
 
 
 #################################

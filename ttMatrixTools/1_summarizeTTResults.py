@@ -1,3 +1,6 @@
+# TIRP non-work destination workflow
+# This is a supporting script of the dual access workflow
+
 # This script processes a csv file of output from Analyst-0.2.3-smx using the 'matrix' operation.
 # The output is a table within a PostgreSQl database that contains the min, max and deciles of traveltime
 # between OD pairs for the selected time period. This code is flexible for any matrix input as long as there are
@@ -109,7 +112,7 @@ class DBObject:
         print(self.cursor.mogrify(query))
         print(datetime.now())
 
-    # uses linear interpolation to determine percentile when landing between to values
+    # uses linear interpolation to determine percentile when landing between two values
     def write_sql_function(self):
         print("Writing calc_deciles function")
         postgresql_function = """create or replace function calc_deciles(_tt integer[])
@@ -220,6 +223,8 @@ if __name__ == '__main__':
         finally:
             my_db_obj.clean_close()
     # Course 2: CMLTV
+    # This is an experimental path to circumvent TT matrix generation and instead calculate approximate TTs based on
+    # higher resolution (min-by-min) accessibilities. Not used in final TIRP results. 03/11/2021
     elif args.TT_OR_CMLTV == 'CMLTV':
         try:
             destination_types = []
