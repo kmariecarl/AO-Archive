@@ -1,5 +1,5 @@
 # Access to Non-Work Destinations: How to go from Start to Finish—TIRP Process
-This set of tools calculates travel times from block origins to POI destinations. Accessibility for each block is reported as the travel time to reach the first 10 POI destinations, where theprogram travel time is taken from repeated measurement (120 departure times to account for transit service frequency) and the 50th percentile travel time is reported for each OD pair.
+This set of tools calculates travel times from block origins to POI destinations. Accessibility for each block is reported as the travel time to reach the first 10 POI destinations, where the travel time is taken from repeated measurement (120 departure times to account for transit service frequency) and the 50th percentile travel time is reported for each OD pair.
 
 This set of tools are designed to accommodate numerous scenario and remove user error by utilizing configuration files to set up all scenario parameters. The analysis bundles are created by the program and sent to an EC2 instance for processing, then pulled down, loaded to your database, pre-processsed to find 50th percentile travel times, and aggregated with political boundary and demograph data for generating scenario statistics tables. The scenarios are automatically mapped at the end of the program.
 
