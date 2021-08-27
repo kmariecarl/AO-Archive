@@ -1,0 +1,46 @@
+{
+    "scenarios": {
+    	"bde": {
+    		"scen_bs": "Funded baseline",
+    		"scen_updt": "B Line, D Line, E Line",
+    		"scen_chg": "B Line, D Line, E Line",
+    		"scen_short": "bde"
+    	},
+    	"bd": {
+    		"scen_bs": "Funded baseline + B Line, D Line",
+    		"scen_updt": "B Line, D Line, E Line",
+    		"scen_chg": "E Line",
+    		"scen_short": "bd"
+    	},
+    	"be": {
+    		"scen_bs": "Funded baseline + B Line, E Line",
+    		"scen_updt": "B Line, D Line, E Line",
+    		"scen_chg": "D Line",
+    		"scen_short": "be"
+    	},
+    	"de": {
+    		"scen_bs": "Funded baseline + D Line, E Line",
+    		"scen_updt": "B Line, D Line, E Line",
+    		"scen_chg": "B Line",
+    		"scen_short": "de"
+    	},
+    	"goldrush": {
+    		"scen_bs": "Funded baseline + B, D, E Line",
+    		"scen_updt": "Gold Line, Rush Line",
+    		"scen_chg": "Gold Line, Rush Line",
+    		"scen_short": "goldrush"
+    	},
+    	"gold": {
+    		"scen_bs": "Funded baseline + B, D, E, Gold Line",
+    		"scen_updt": "Funded baseline + B, D, E, Gold Line, Rush Line",
+    		"scen_chg": "Rush Line",
+    		"scen_short": "gold"
+    	},
+    	"rush": {
+    		"scen_bs": "Funded baseline + B, D, E, Rush Line",
+    		"scen_updt": "Funded baseline + B, D, E, Rush Line, Gold Line",
+    		"scen_chg": "Gold Line",
+    		"scen_short": "rush"
+    	}
+	}
+}

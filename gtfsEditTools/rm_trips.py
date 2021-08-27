@@ -5,8 +5,6 @@
 # Program prompts the user to give the route id IF a file called "route_ids_to_remove.txt" is not
 # provided within the directory.
 
-# ToDo: remove trailing comma at the end of shapes_list output file
-
 #################################
 #           IMPORTS             #
 #################################
@@ -29,13 +27,10 @@ def main():
 
     # User input
     usRouteList = readRoutes()
-    allTripsList, allShapesList = tripsInRoutes(args.TRIPS_FILE, usRouteList)
+    allTripsList, allShapesList, fieldnames = tripsInRoutes(args.TRIPS_FILE, usRouteList)
     mod.writeList('trips_list', allTripsList, curtime)
     mod.writeList('shapes_list', allShapesList, curtime)
-    #if args.REMOVE_TRIPS == 'yes':
     # Write out new trips file
-    fieldnames = ['route_id', 'service_id', 'trip_id', 'trip_headsign', 'direction_id', 'block_id', 'shape_id',
-                   'wheelchair_accessible']
     outfile = open('trips_reduced.txt', 'w', newline='')
     writer = csv.DictWriter(outfile, delimiter=',', fieldnames=fieldnames)
     writer.writeheader()
@@ -89,6 +84,7 @@ def tripsInRoutes(trips_file, usr_route_list):
 
     with open(trips_file) as csvfile:
         trips = csv.DictReader(csvfile)
+        fieldnames = trips.fieldnames
 
         all_trips_list = []
         all_shapes_list = []
@@ -99,7 +95,7 @@ def tripsInRoutes(trips_file, usr_route_list):
         print("length of all_trips_list", len(all_trips_list))
         print("length of all_shapes_list", len(all_shapes_list))
 
-        return all_trips_list, all_shapes_list
+        return all_trips_list, all_shapes_list, fieldnames
     
 # Optional function to reproduce trips.txt file without the trips found to be 
 # associated with the routes provided by the user.
@@ -116,14 +112,9 @@ def removeTrips(trips_file, all_trips_list, writer):
             count1 += 1
             this_trip = str(row['trip_id'])
 
-            if this_trip not in all_trips_list:
+            if this_trip not in all_trips_list:  # compare each trip line w/the input list, only write vals not in list
                 count2 += 1
-                entry = {'route_id': row['route_id'], 'service_id': row['service_id'],
-                         'trip_id': row['trip_id'], 'trip_headsign': row['trip_headsign'],
-                         'direction_id': row['direction_id'], 'block_id': row['block_id'],
-                         'shape_id': row['shape_id'], 'wheelchair_accessible': row['wheelchair_accessible']}
-
-                writer.writerow(entry)
+                writer.writerow(row)
             mybar.next()
         mybar.finish()
         print('Number of rows in original trips file: ', count1)

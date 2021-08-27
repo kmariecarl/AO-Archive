@@ -63,10 +63,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    fieldnames = ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence', 'pickup_type', 'drop_off_type']
-    outfile = open('stop_times_reduced.txt', 'w', newline='')
-    writer = csv.DictWriter(outfile, delimiter=',', fieldnames=fieldnames)
-    writer.writeheader()
+    # fieldnames = ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence', 'pickup_type', 'drop_off_type']
+
 
     tripsList = makeTripsList(args.TRIPS_LIST_FILE)
     stream = os.popen(f'wc -l < {args.STOP_TIMES_FILE}')
@@ -75,16 +73,21 @@ if __name__ == '__main__':
     mybar = ProgressBar(lines)
     with open(args.STOP_TIMES_FILE) as csvfile2:
         stops_file = csv.DictReader(csvfile2)
+        fieldnames = stops_file.fieldnames
+        outfile = open('stop_times_reduced.txt', 'w', newline='')
+        writer = csv.DictWriter(outfile, delimiter=',', fieldnames=fieldnames)
+        writer.writeheader()
+
         count1 = 0
         count2 = 0
         for row in stops_file:
             trip = str(row['trip_id'])
             if trip not in tripsList:
-                entry = {'trip_id': row['trip_id'], 'arrival_time': row['arrival_time'], 'departure_time': row['departure_time'],
-                         'stop_id': row['stop_id'], 'stop_sequence': row['stop_sequence'], 'pickup_type': row['pickup_type'],
-                         'drop_off_type': row['drop_off_type']}
+                # entry = {'trip_id': row['trip_id'], 'arrival_time': row['arrival_time'], 'departure_time': row['departure_time'],
+                #          'stop_id': row['stop_id'], 'stop_sequence': row['stop_sequence'], 'pickup_type': row['pickup_type'],
+                #          'drop_off_type': row['drop_off_type']}
 
-                writer.writerow(entry)
+                writer.writerow(row)
                 count2 += 1
             count1 += 1
             mybar.add_progress()

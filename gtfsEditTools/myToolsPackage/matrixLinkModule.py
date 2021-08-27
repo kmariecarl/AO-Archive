@@ -46,9 +46,14 @@ def elapsedTime(start_time):
 #This function writes out a list of values separated by commas and ending in a comma. Single line, no rows or carriage return.
 def writeList(file_name, list, currentTime):
     with open('{}_{}.txt'.format(file_name, currentTime), 'w') as outlist:
+        count = 0
         for item in list:
-            outlist.write(item)
-            outlist.write(',')
+            if count == len(list) - 1:
+                outlist.write(item)  # Do not write a comma after the last item
+            else:
+                outlist.write(item)
+                outlist.write(',')
+            count +=1
 
 # This function reads in the list file created using writeList() above and creates a new list for the current program to use
 def readList(file, type):

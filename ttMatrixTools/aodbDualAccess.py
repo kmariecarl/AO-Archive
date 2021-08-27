@@ -1,3 +1,6 @@
+# Workflow using NAE access db for demographic analyses at various spatial scales
+# This script was used in conjunction w/the Accessibility: Distribution Across Diverse Populations TRB & WSTLUR Papers
+
 # This file connects with the aodb and results schemas and computes the dual accessibility given a threshold number of
 # jobs to reach.
 
