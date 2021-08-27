@@ -1,6 +1,6 @@
 # Access to Non-Work Destinations: How to go from Start to Finish—TIRP Process
 ### The tools and processes below can be adpated for other scenario evaluations, transit or other modes
-### NOTE: Some tools in this folder were never actually used in the TIRP workflow
+### NOTE: Some tools in this folder were never actually used in the TIRP workflow, the ones that were are noted in the steps below
 	1. Initialize directory folder
 		a. Give the folder a brief name (this will be attached as a naming convention throughout the program), i.e. BDE, GoldRush, etc.
 	2. Create origin and destination sets
