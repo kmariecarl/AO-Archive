@@ -1,3 +1,14 @@
+# GTFS speed updater script steps
+1. Use stopTimesEditor8 to get new gtfs data
+2. Run accessibility calc on original and updated gtfs data. Break calcs into separate hours, 7:00-7:59 and 8:00-9:00.
+3. Merge the two accessibility output .csv files using the process described below.
+4. Use AverageTransitLocal to get an average accessibility value over the 2 hour window, one value per block and per threshold. Repeat for baseline files. (15 min)
+5. Use processAccessResults4 to find the abs. change, percent change, and raw values and output a new .csv file. (1 min)
+6. Add the processed_access_results.csv file to QGIS and join to a polygon vector layer that uses GEOID10 as the join key.
+7. Join the raw worker values for each block to the same layer as in step 6 (MN_Rac_S000_2014). Now save the layer with a new name.
+8. Export layer as a .csv and use with the workerWeightAccess.py program
+Use Mac to run worker weighted accessibility program.
+
 # Steps to combine existing GTFS feeds for new scenario
 How to Splice GTFS Records together for Transit Scenario Evaluations
 1. Designate your baseline GTFS records and calculate the baseline transit accessibility for your analysis zone 

@@ -1,4 +1,4 @@
-# Bus-Highway
-All programs related to the MnDOT sponsored bus-highway interactions project. This repository continues to be expanded with new tools for transit and mixed-mode accessibility analyses.
+# READ ME
+This repository includes all code resources developed for the bus-highway research project, Met Council transitway evaluation project, and TIRP research project. The repo is in the process of being reorganized based on project.
 
 All tools created by Kristin M. Carlson
