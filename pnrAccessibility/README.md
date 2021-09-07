@@ -1,4 +1,4 @@
-# Steps for calculating Park-and-Ride Accessibility
+# Steps for calculating Park-and-Ride Accessibility in Time and Dollars
 The steps and tools referenced below were developed for Task 5 of the Bus-Highway research project in 2017 and 2018.
 
 	1. Calculate origin set to PNR set TT matrix by auto
@@ -21,4 +21,28 @@ The steps and tools referenced below were developed for Task 5 of the Bus-Highwa
 	8. Use averageTransitLocal.py to average the results across the departure times (Note that each origin may not have a viable and shortest path through a PNR at every departure time)
 		a. Output: Label,threshold,jobs
 	9. Use processAccessResults4.py to compare these O + PNR + D accessibility results to some other mode with the same OD set.
-Output: weighted percent, raw values, differences, raw percent at each threshold
+	Output: weighted percent, raw values, differences, raw percent at each threshold
+
+# How to Calculate Monetary Accessibility_PNR
+	1. Use the AOBatchAnalyst-PM to find the path set (link-by-link) for your origin to PNR set. Run time for TAZ (3030 x 114 x 13 and Maxtime= xxxx) is: infinity   File size is:
+	2. Use the linkCostCalculator.py program to compute individual link charges based on link speed and distance. (Runtime is 2.7 days for a 428 GB path analyst file, and resulting file size is  325 GB.) Reduces the file size by 76% on average.
+	3. Use the linkCostAggregator.py program to sum the link charges into a variety of scenarios. Resulting file should be 1/70th of the path file. Ex 325 GB-> 2.55 GB path cost. Run time is 17 hours for (54,000 x 114 x 13).
+	4. Load the path cost data into PostgreSQL database tables --> SQL scripts called create_path_cost_table.sql & load_path_cost_table.sql. Runtime 2 minutes. Size of table with indices is 10.5 GB
+	5. Additional database tables should include the O2PNR, PNR2D15 travel time matrices and the jobs table. These tables are used to concurrently find the time-based accessibility.
+
+
+# How to Calculate Monetary Accessibility_Auto
+1. Use the AOBatchAnalyst-PM to find the path set (link-by-link) for your origin to destination set. Run time for TAZ (3030 x 3030 x 13 and Maxtime=2400) is: infinity   File size is:
+2. Use the linkCostCalculator.py program to compute individual link charges based on link speed and distance. (Runtime is 2.7 days for a 428 GB path analyst file, and resulting file size is  325 GB.) Reduces the file size by 76% on average.
+3. Use the linkCostAggregator.py program to sum the link charges into a variety of scenarios. Resulting file should be 1/70th of the path file. Ex 325 GB-> 2.55 GB path cost. Run time is: 17 hours for (54,000 x 114 x 13).
+4. Use the parking cost by destination data set to load into SQL table --> SQL scripts called:  . Runtime is: 2 minutes. Size of table with indices is:
+5. Additional database tables should include the O2PNR, PNR2D15 travel time matrices and the jobs table. These tables are used to concurrently find the time-based accessibility.
+
+
+
+# How to Calculate Monetary Accessibility_Transit
+1. Use the AOBatchAnalyst-PM to find the path set (link-by-link) for your origin to destination set. Run time for TAZ (3030 x 3030 x 13 and Maxtime=2400) is: infinity   File size is:
+2. Use the linkCostCalculator.py program to compute individual link charges based on link speed and distance. (Runtime is 2.7 days for a 428 GB path analyst file, and resulting file size is  325 GB.) Reduces the file size by 76% on average.
+3. Use the linkCostAggregator.py program to sum the link charges into a variety of scenarios. Resulting file should be 1/70th of the path file. Ex 325 GB-> 2.55 GB path cost. Run time is: 17 hours for (54,000 x 114 x 13).
+4. Use the parking cost by destination data set to load into SQL table --> SQL scripts called:  . Runtime is: 2 minutes. Size of table with indices is:
+5. Additional database tables should include the O2PNR, PNR2D15 travel time matrices and the jobs table. These tables are used to concurrently find the time-based accessibility.
